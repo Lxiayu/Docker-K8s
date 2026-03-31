@@ -1,0 +1,40 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-service-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kubernetes-service-alerts
+    app.kubernetes.io/component: alerting
+    release: prometheus-operator
+spec:
+  groups:
+    - name: service-alerts
+      interval: 30s
+      rules:
+        - alert: ServiceEndpointDown
+          expr: sum(kube_endpoint_address_available) by (namespace, endpoint) / sum(kube_endpoint_address_not_ready + kube_endpoint_address_available) by (namespace, endpoint) < 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "服务 {{ $labels.namespace }}/{{ $labels.endpoint }} 部分端点不可用"
+            description: "服务 {{ $labels.namespace }}/{{ $labels.endpoint }} 有部分端点不可用，请检查 Pod 状态。"
+
+        - alert: ServiceNoEndpoints
+          expr: sum(kube_endpoint_address_available) by (namespace, endpoint) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "服务 {{ $labels.namespace }}/{{ $labels.endpoint }} 没有可用端点"
+            description: "服务 {{ $labels.namespace }}/{{ $labels.endpoint }} 没有可用的端点，服务可能完全不可用。"
+
+        - alert: IngressBackendErrors
+          expr: sum(rate(nginx_ingress_controller_requests{status=~"5.."}[5m])) by (namespace, ingress, service) / sum(rate(nginx_ingress_controller_requests[5m])) by (namespace, ingress, service) * 100 > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ingress {{ $labels.namespace }}/{{ $labels.ingress }} 后端错误率过高"
+            description: "Ingress {{ $labels.namespace }}/{{ $labels.ingress }} 到服务 {{ $labels.service }} 的 5xx 错误率超过 10%，当前值为 {{ $value }}%。"

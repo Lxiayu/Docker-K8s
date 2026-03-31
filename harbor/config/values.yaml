@@ -1,0 +1,146 @@
+expose:
+  type: ingress
+  ingress:
+    hosts:
+      core: harbor.local
+      notary: notary.harbor.local
+    className: nginx
+    annotations:
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    tls:
+      enabled: true
+      secretName: harbor-tls
+      notarySecretName: notary-tls
+
+externalURL: https://harbor.local
+
+internalTLS:
+  enabled: true
+  strong_ssl_ciphers: false
+
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      existingClaim: ""
+      storageClass: ""
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 50Gi
+    chartmuseum:
+      existingClaim: ""
+      storageClass: ""
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 10Gi
+    trivy:
+      existingClaim: ""
+      storageClass: ""
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 5Gi
+    harborDatabase:
+      existingClaim: ""
+      storageClass: ""
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 10Gi
+    redis:
+      existingClaim: ""
+      storageClass: ""
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 1Gi
+
+imagePullPolicy: IfNotPresent
+
+harborAdminPassword: "Harbor12345"
+
+portal:
+  replicas: 1
+
+core:
+  replicas: 1
+
+jobservice:
+  replicas: 1
+  jobLog:
+    backend: "database"
+
+registry:
+  replicas: 1
+  middleware:
+    enabled: false
+
+chartmuseum:
+  enabled: true
+  replicas: 1
+
+trivy:
+  enabled: true
+  replicas: 1
+  updateStrategy:
+    type: Recreate
+  gitHubToken: ""
+  skipUpdate: false
+  offlineScan: false
+  securityCheck: true
+  insecure: false
+
+notary:
+  enabled: true
+  server:
+    replicas: 1
+  signer:
+    replicas: 1
+
+database:
+  type: internal
+  internal:
+    password: "changeit"
+    shmSizeLimit: 512Mi
+    initContainer:
+      migrator: {}
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+
+redis:
+  type: internal
+  internal:
+    password: "changeit"
+
+exporter:
+  replicas: 1
+  cacheDuration: 23
+  port: 8001
+  metrics:
+    enabled: true
+    path: /metrics
+
+metrics:
+  enabled: true
+  core:
+    path: /metrics
+    port: 8001
+  registry:
+    path: /metrics
+    port: 8001
+  exporter:
+    path: /metrics
+    port: 8001
+
+logLevel: info
+
+gc:
+  enabled: true
+  schedule: "0 0 0 * * *"
+  deleteUntagged: true
+
+auditLog:
+  enabled: false

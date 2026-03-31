@@ -1,0 +1,254 @@
+{
+  "projects": [
+    {
+      "project_name": "production",
+      "public": false,
+      "metadata": {
+        "public": "false",
+        "enable_content_trust": "true",
+        "prevent_vul": "true",
+        "severity": "high",
+        "auto_scan": "true",
+        "reuse_sys_cve_allowlist": "true"
+      },
+      "quota": {
+        "storage_limit": -1
+      },
+      "registry_id": null,
+      "storage_limit": -1
+    },
+    {
+      "project_name": "staging",
+      "public": false,
+      "metadata": {
+        "public": "false",
+        "enable_content_trust": "false",
+        "prevent_vul": "true",
+        "severity": "critical",
+        "auto_scan": "true",
+        "reuse_sys_cve_allowlist": "true"
+      },
+      "quota": {
+        "storage_limit": -1
+      },
+      "registry_id": null,
+      "storage_limit": -1
+    },
+    {
+      "project_name": "development",
+      "public": false,
+      "metadata": {
+        "public": "false",
+        "enable_content_trust": "false",
+        "prevent_vul": "false",
+        "severity": "critical",
+        "auto_scan": "true",
+        "reuse_sys_cve_allowlist": "true"
+      },
+      "quota": {
+        "storage_limit": -1
+      },
+      "registry_id": null,
+      "storage_limit": -1
+    },
+    {
+      "project_name": "library",
+      "public": true,
+      "metadata": {
+        "public": "true",
+        "enable_content_trust": "false",
+        "prevent_vul": "false",
+        "severity": "high",
+        "auto_scan": "true",
+        "reuse_sys_cve_allowlist": "true"
+      },
+      "quota": {
+        "storage_limit": -1
+      },
+      "registry_id": null,
+      "storage_limit": -1
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@harbor.local",
+      "realname": "System Administrator",
+      "comment": "System admin account",
+      "password": "Harbor12345",
+      "role_id": 1
+    },
+    {
+      "username": "devops",
+      "email": "devops@harbor.local",
+      "realname": "DevOps Team",
+      "comment": "DevOps team account",
+      "password": "DevOps@123",
+      "role_id": 2
+    },
+    {
+      "username": "developer",
+      "email": "developer@harbor.local",
+      "realname": "Developer",
+      "comment": "Developer account",
+      "password": "Developer@123",
+      "role_id": 3
+    },
+    {
+      "username": "viewer",
+      "email": "viewer@harbor.local",
+      "realname": "Viewer",
+      "comment": "Read-only viewer account",
+      "password": "Viewer@123",
+      "role_id": 4
+    }
+  ],
+  "project_members": [
+    {
+      "project_name": "production",
+      "members": [
+        {
+          "username": "devops",
+          "role": "admin"
+        },
+        {
+          "username": "developer",
+          "role": "developer"
+        }
+      ]
+    },
+    {
+      "project_name": "staging",
+      "members": [
+        {
+          "username": "devops",
+          "role": "admin"
+        },
+        {
+          "username": "developer",
+          "role": "developer"
+        }
+      ]
+    },
+    {
+      "project_name": "development",
+      "members": [
+        {
+          "username": "devops",
+          "role": "admin"
+        },
+        {
+          "username": "developer",
+          "role": "admin"
+        }
+      ]
+    }
+  ],
+  "robot_accounts": [
+    {
+      "name": "robot-cicd",
+      "description": "CI/CD pipeline robot account",
+      "projects": [
+        {
+          "name": "production",
+          "permissions": [
+            {
+              "kind": "repository",
+              "access": [
+                {
+                  "action": "push",
+                  "resource": "repository"
+                },
+                {
+                  "action": "pull",
+                  "resource": "repository"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "staging",
+          "permissions": [
+            {
+              "kind": "repository",
+              "access": [
+                {
+                  "action": "push",
+                  "resource": "repository"
+                },
+                {
+                  "action": "pull",
+                  "resource": "repository"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "development",
+          "permissions": [
+            {
+              "kind": "repository",
+              "access": [
+                {
+                  "action": "push",
+                  "resource": "repository"
+                },
+                {
+                  "action": "pull",
+                  "resource": "repository"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expires_at": -1,
+      "disabled": false
+    },
+    {
+      "name": "robot-scanner",
+      "description": "Image scanner robot account",
+      "projects": [
+        {
+          "name": "production",
+          "permissions": [
+            {
+              "kind": "repository",
+              "access": [
+                {
+                  "action": "pull",
+                  "resource": "repository"
+                },
+                {
+                  "action": "read",
+                  "resource": "scan"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expires_at": -1,
+      "disabled": false
+    }
+  ],
+  "webhooks": [
+    {
+      "project_name": "production",
+      "webhook": {
+        "name": "production-webhook",
+        "url": "https://cicd-platform.local/api/webhooks/harbor",
+        "description": "Production project webhook for CI/CD integration",
+        "events_types": [
+          "PUSH_ARTIFACT",
+          "DELETE_ARTIFACT",
+          "SCANNING_COMPLETED",
+          "SCANNING_FAILED"
+        ],
+        "enabled": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbor-scanner-config
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: scanner
+data:
+  scanner-config.yaml: |
+    trivy:
+      enabled: true
+      version: latest
+      
+      offlineScan: false
+      skipUpdate: false
+      
+      securityChecks:
+        - vuln
+        - secret
+        - misconfig
+      
+      severityThreshold: "HIGH"
+      
+      ignoreUnfixed: true
+      
+      timeout: 5m0s
+      
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 2Gi
+      
+      dbRepository: ghcr.io/aquasecurity/trivy-db
+      javaDbRepository: ghcr.io/aquasecurity/trivy-java-db
+      
+      scanSchedule: "0 0 * * *"
+      
+      vulnerabilityTypes:
+        - os
+        - library
+      
+      scanLayers: true
+      
+      outputFormat: json
+      
+      whitelist:
+        enabled: false
+        expireAfter: 30d
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trivy-db-updater
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: trivy-updater
+spec:
+  schedule: "0 0 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: trivy-updater
+            image: aquasec/trivy:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              trivy image --download-db-only
+              echo "Trivy database updated successfully"
+            volumeMounts:
+            - name: trivy-db
+              mountPath: /root/.cache/trivy
+          volumes:
+          - name: trivy-db
+            persistentVolumeClaim:
+              claimName: harbor-trivy
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbor-scan-policy
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: scan-policy
+data:
+  policy.yaml: |
+    defaultPolicy:
+      name: "default-scan-policy"
+      description: "默认镜像扫描策略"
+      
+      scanOnPush: true
+      
+      blockOnVulnerability: true
+      severityThreshold: "HIGH"
+      
+      blockOnUnfixed: true
+      
+      scanSchedule:
+        enabled: true
+        cron: "0 2 * * *"
+      
+      notifications:
+        enabled: true
+        channels:
+          - type: email
+            enabled: true
+          - type: webhook
+            enabled: false
+            url: ""
+      
+      retention:
+        enabled: true
+        scanReportsRetention: 90d
+    
+    projectPolicies:
+      - projectName: "production"
+        policy:
+          scanOnPush: true
+          blockOnVulnerability: true
+          severityThreshold: "MEDIUM"
+          blockOnUnfixed: false
+      
+      - projectName: "development"
+        policy:
+          scanOnPush: true
+          blockOnVulnerability: false
+          severityThreshold: "CRITICAL"
+          blockOnUnfixed: false

@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: redis-podmonitor
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: monitoring
+    release: prometheus-operator
+spec:
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  namespaceSelector:
+    any: true
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s

@@ -1,0 +1,198 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elasticsearch-credentials
+  namespace: logging
+type: Opaque
+stringData:
+  ELASTIC_USERNAME: "elastic"
+  ELASTIC_PASSWORD: "changeme"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: logging
+data:
+  elasticsearch.yml: |
+    cluster.name: "k8s-logs"
+    node.name: "${POD_NAME}"
+    network.host: 0.0.0.0
+    
+    discovery.seed_hosts: "elasticsearch-0.elasticsearch,elasticsearch-1.elasticsearch,elasticsearch-2.elasticsearch"
+    cluster.initial_master_nodes: "elasticsearch-0,elasticsearch-1,elasticsearch-2"
+    
+    node.master: true
+    node.data: true
+    node.ingest: true
+    
+    xpack.security.enabled: true
+    xpack.security.transport.ssl.enabled: false
+    xpack.security.http.ssl.enabled: false
+    
+    path.data: /usr/share/elasticsearch/data
+    path.logs: /usr/share/elasticsearch/logs
+    
+    bootstrap.memory_lock: true
+    
+    indices.lifecycle.poll_interval: 10m
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: logging
+  labels:
+    app: elasticsearch
+    app.kubernetes.io/name: elasticsearch
+    app.kubernetes.io/component: database
+spec:
+  serviceName: elasticsearch
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        app.kubernetes.io/name: elasticsearch
+    spec:
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.35
+        command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+      - name: increase-vm-max-map
+        image: busybox:1.35
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
+      - name: increase-fd-ulimit
+        image: busybox:1.35
+        command: ["sh", "-c", "ulimit -n 65536"]
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ES_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: ELASTIC_PASSWORD
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 2000m
+            memory: 8Gi
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+        - name: elasticsearch-config
+          mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          subPath: elasticsearch.yml
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: 9200
+            httpHeaders:
+            - name: Authorization
+              value: "Basic ZWxhc3RpYzpjaGFuZ2VtZQ=="
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: 9200
+            httpHeaders:
+            - name: Authorization
+              value: "Basic ZWxhc3RpYzpjaGFuZ2VtZQ=="
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: elasticsearch-config
+        configMap:
+          name: elasticsearch-config
+      terminationGracePeriodSeconds: 180
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: elasticsearch
+              topologyKey: kubernetes.io/hostname
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+      labels:
+        app: elasticsearch
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: logging
+  labels:
+    app: elasticsearch
+    app.kubernetes.io/name: elasticsearch
+spec:
+  ports:
+  - port: 9200
+    name: http
+    targetPort: 9200
+  - port: 9300
+    name: transport
+    targetPort: 9300
+  clusterIP: None
+  selector:
+    app: elasticsearch
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-client
+  namespace: logging
+  labels:
+    app: elasticsearch
+    app.kubernetes.io/name: elasticsearch
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9200
+    name: http
+    targetPort: 9200
+  selector:
+    app: elasticsearch

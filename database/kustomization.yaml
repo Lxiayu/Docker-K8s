@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: database
+
+resources:
+  - namespace.yaml
+  - postgres/secret.yaml
+  - postgres/configmap.yaml
+  - postgres/configmap-init-scripts.yaml
+  - postgres/pvc.yaml
+  - postgres/service.yaml
+  - postgres/statefulset.yaml
+  - backup/scripts.yaml
+  - backup/cronjob.yaml
+  - monitoring/servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: cicd-platform
+  app.kubernetes.io/managed-by: kustomize

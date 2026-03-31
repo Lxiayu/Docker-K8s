@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: monitoring
+data:
+  kubernetes-cluster-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Kubernetes Cluster Overview",
+        "tags": ["kubernetes"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[5m])) by (node)",
+                "legendFormat": "{{node}}",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "Cluster Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{container!=\"\"}) by (node)",
+                "legendFormat": "{{node}}",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "Pod Count by Namespace",
+            "type": "piechart",
+            "targets": [
+              {
+                "expr": "sum(kube_pod_info) by (namespace)",
+                "legendFormat": "{{namespace}}",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "Node Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_node_status_condition{condition=\"Ready\"}",
+                "format": "table",
+                "instant": true,
+                "refId": "A"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            }
+          }
+        ],
+        "schemaVersion": 27,
+        "version": 0,
+        "refresh": "30s"
+      },
+      "overwrite": true
+    }

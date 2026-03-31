@@ -1,0 +1,49 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-resource-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kubernetes-resource-alerts
+    app.kubernetes.io/component: alerting
+    release: prometheus-operator
+spec:
+  groups:
+    - name: resource-alerts
+      interval: 30s
+      rules:
+        - alert: PersistentVolumeUsageCritical
+          expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100 > 90
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "持久卷 {{ $labels.persistentvolumeclaim }} 使用率过高"
+            description: "命名空间 {{ $labels.namespace }} 中的 PVC {{ $labels.persistentvolumeclaim }} 使用率超过 90%，当前值为 {{ $value }}%。"
+
+        - alert: PersistentVolumeFullInFourDays
+          expr: predict_linear(kubelet_volume_stats_used_bytes[6h], 4 * 24 * 3600) >= kubelet_volume_stats_capacity_bytes
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "持久卷 {{ $labels.persistentvolumeclaim }} 将在 4 天内满"
+            description: "命名空间 {{ $labels.namespace }} 中的 PVC {{ $labels.persistentvolumeclaim }} 预计将在 4 天内满，请及时扩容。"
+
+        - alert: ResourceQuotaExceeded
+          expr: kube_resourcequota{type="used"} / kube_resourcequota{type="hard"} * 100 > 90
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "资源配额 {{ $labels.namespace }}/{{ $labels.resourcequota }} 即将耗尽"
+            description: "命名空间 {{ $labels.namespace }} 中的资源配额 {{ $labels.resourcequota }} 使用率超过 90%，当前值为 {{ $value }}%。"
+
+        - alert: HPAUnableToScale
+          expr: kube_hpa_status_condition{condition="ScalingLimited",status="true"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} 无法扩展"
+            description: "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} 受到扩展限制，可能已达到最大副本数或资源不足。"

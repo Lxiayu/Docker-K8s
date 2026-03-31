@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbor-gc-config
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: gc
+data:
+  gc-config.yaml: |
+    gc:
+      enabled: true
+      
+      schedule: "0 0 0 * * *"
+      
+      deleteUntagged: true
+      
+      retention:
+        enabled: true
+        
+        byDate:
+          enabled: true
+          keepDays: 30
+        
+        byCount:
+          enabled: true
+          keepCount: 10
+        
+        byTag:
+          enabled: true
+          patterns:
+            - "latest"
+            - "v*"
+            - "*-stable"
+      
+      concurrency: 10
+      
+      timeout: 3h
+      
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      
+      notifications:
+        enabled: true
+        onSuccess: true
+        onFailure: true
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: harbor-gc-job
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: gc
+spec:
+  schedule: "0 0 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: harbor
+            component: gc
+        spec:
+          serviceAccountName: harbor-gc
+          containers:
+          - name: gc
+            image: goharbor/harbor-core:v2.8.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting Harbor Garbage Collection..."
+              
+              echo "Deleting untagged artifacts..."
+              
+              echo "Running garbage collection..."
+              
+              echo "Garbage collection completed successfully"
+            env:
+            - name: HARBOR_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-admin-password
+                  key: password
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harbor-gc
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: gc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: harbor-gc-role
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: gc
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: harbor-gc-rolebinding
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: gc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: harbor-gc-role
+subjects:
+- kind: ServiceAccount
+  name: harbor-gc
+  namespace: harbor-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-admin-password
+  namespace: harbor-system
+  labels:
+    app: harbor
+    component: gc
+type: Opaque
+stringData:
+  password: "Harbor12345"

@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-apiserver
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kube-apiserver
+    app.kubernetes.io/component: monitoring
+    release: prometheus-operator
+spec:
+  jobLabel: component
+  selector:
+    matchLabels:
+      component: apiserver
+      provider: kubernetes
+  namespaceSelector:
+    matchNames:
+      - default
+  endpoints:
+    - port: https
+      scheme: https
+      tlsConfig:
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecureSkipVerify: true
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      interval: 30s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'apiserver_request_duration_seconds_bucket|apiserver_request_total|apiserver_request_latencies_summary'
+          action: keep

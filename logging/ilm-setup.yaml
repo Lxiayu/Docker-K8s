@@ -1,0 +1,226 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: elasticsearch-ilm-setup
+  namespace: logging
+  labels:
+    app.kubernetes.io/name: elasticsearch-ilm-setup
+    app.kubernetes.io/component: configuration
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      serviceAccountName: elasticsearch-ilm-setup
+      restartPolicy: OnFailure
+      containers:
+      - name: curl
+        image: curlimages/curl:8.5.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "Waiting for Elasticsearch to be ready..."
+          until curl -s -u elastic:changeme http://elasticsearch-client:9200/_cluster/health?wait_for_status=yellow&timeout=30s > /dev/null 2>&1; do
+            echo "Elasticsearch is not ready yet, waiting..."
+            sleep 5
+          done
+          echo "Elasticsearch is ready!"
+          
+          echo "Creating ILM Policy..."
+          curl -X PUT "http://elasticsearch-client:9200/_ilm/policy/k8s-logs-policy" \
+            -u elastic:changeme \
+            -H "Content-Type: application/json" \
+            -d '{
+              "policy": {
+                "phases": {
+                  "hot": {
+                    "min_age": "0ms",
+                    "actions": {
+                      "rollover": {
+                        "max_size": "50GB",
+                        "max_age": "1d",
+                        "max_docs": 100000000
+                      },
+                      "set_priority": {
+                        "priority": 100
+                      }
+                    }
+                  },
+                  "warm": {
+                    "min_age": "7d",
+                    "actions": {
+                      "forcemerge": {
+                        "max_num_segments": 1
+                      },
+                      "shrink": {
+                        "number_of_shards": 1
+                      },
+                      "allocate": {
+                        "number_of_replicas": 1
+                      },
+                      "set_priority": {
+                        "priority": 50
+                      }
+                    }
+                  },
+                  "cold": {
+                    "min_age": "30d",
+                    "actions": {
+                      "freeze": {},
+                      "allocate": {
+                        "number_of_replicas": 0
+                      },
+                      "set_priority": {
+                        "priority": 0
+                      }
+                    }
+                  },
+                  "delete": {
+                    "min_age": "90d",
+                    "actions": {
+                      "delete": {
+                        "delete_searchable_snapshot": true
+                      }
+                    }
+                  }
+                }
+              }
+            }'
+          echo ""
+          
+          echo "Creating Index Template..."
+          curl -X PUT "http://elasticsearch-client:9200/_index_template/k8s-logs-template" \
+            -u elastic:changeme \
+            -H "Content-Type: application/json" \
+            -d '{
+              "index_patterns": ["k8s-logs-*"],
+              "priority": 100,
+              "template": {
+                "settings": {
+                  "number_of_shards": 3,
+                  "number_of_replicas": 1,
+                  "index.lifecycle.name": "k8s-logs-policy",
+                  "index.lifecycle.rollover_alias": "k8s-logs",
+                  "index.refresh_interval": "5s",
+                  "index.number_of_routing_shards": 30
+                },
+                "mappings": {
+                  "properties": {
+                    "@timestamp": {
+                      "type": "date"
+                    },
+                    "@log_stream": {
+                      "type": "keyword"
+                    },
+                    "log": {
+                      "type": "text"
+                    },
+                    "stream": {
+                      "type": "keyword"
+                    },
+                    "message": {
+                      "type": "text"
+                    },
+                    "pod_name": {
+                      "type": "keyword"
+                    },
+                    "namespace": {
+                      "type": "keyword"
+                    },
+                    "container_name": {
+                      "type": "keyword"
+                    },
+                    "container_image": {
+                      "type": "keyword"
+                    },
+                    "host": {
+                      "type": "keyword"
+                    },
+                    "hostname": {
+                      "type": "keyword"
+                    },
+                    "cluster_name": {
+                      "type": "keyword"
+                    },
+                    "environment": {
+                      "type": "keyword"
+                    },
+                    "log_processed": {
+                      "type": "object",
+                      "enabled": false
+                    }
+                  }
+                }
+              }
+            }'
+          echo ""
+          
+          echo "Creating Initial Index..."
+          curl -X PUT "http://elasticsearch-client:9200/k8s-logs-000001" \
+            -u elastic:changeme \
+            -H "Content-Type: application/json" \
+            -d '{
+              "aliases": {
+                "k8s-logs": {
+                  "is_write_index": true
+                }
+              }
+            }'
+          echo ""
+          
+          echo "Creating Component Templates..."
+          curl -X PUT "http://elasticsearch-client:9200/_component_template/k8s-logs-settings" \
+            -u elastic:changeme \
+            -H "Content-Type: application/json" \
+            -d '{
+              "template": {
+                "settings": {
+                  "index.lifecycle.name": "k8s-logs-policy",
+                  "index.lifecycle.rollover_alias": "k8s-logs",
+                  "number_of_shards": 3,
+                  "number_of_replicas": 1
+                }
+              }
+            }'
+          echo ""
+          
+          curl -X PUT "http://elasticsearch-client:9200/_component_template/k8s-logs-mappings" \
+            -u elastic:changeme \
+            -H "Content-Type: application/json" \
+            -d '{
+              "template": {
+                "mappings": {
+                  "properties": {
+                    "@timestamp": {
+                      "type": "date"
+                    },
+                    "log": {
+                      "type": "text"
+                    },
+                    "message": {
+                      "type": "text"
+                    },
+                    "pod_name": {
+                      "type": "keyword"
+                    },
+                    "namespace": {
+                      "type": "keyword"
+                    },
+                    "container_name": {
+                      "type": "keyword"
+                    }
+                  }
+                }
+              }
+            }'
+          echo ""
+          
+          echo "ILM setup completed successfully!"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elasticsearch-ilm-setup
+  namespace: logging

@@ -1,0 +1,153 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: database
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cicd-platform
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgresql-backup
+            app.kubernetes.io/component: database
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:15.4-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="/backup/cicd_platform_${BACKUP_DATE}.sql.gz"
+              
+              echo "Starting backup at $(date)"
+              
+              pg_dump -h postgres-service \
+                -U backup_user \
+                -d cicd_platform \
+                -F p \
+                --no-owner \
+                --no-acl \
+                --clean \
+                --if-exists \
+                | gzip > ${BACKUP_FILE}
+              
+              if [ $? -eq 0 ]; then
+                echo "Backup completed successfully: ${BACKUP_FILE}"
+                ls -lh ${BACKUP_FILE}
+                
+                find /backup -name "*.sql.gz" -type f -mtime +30 -delete
+                echo "Old backups cleaned up"
+              else
+                echo "Backup failed!"
+                exit 1
+              fi
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: backup-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup-weekly
+  namespace: database
+  labels:
+    app.kubernetes.io/name: postgresql-backup-weekly
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cicd-platform
+spec:
+  schedule: "0 3 * * 0"
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 2
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgresql-backup-weekly
+            app.kubernetes.io/component: database
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:15.4-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="/backup/weekly/cicd_platform_weekly_${BACKUP_DATE}.sql.gz"
+              
+              mkdir -p /backup/weekly
+              
+              echo "Starting weekly backup at $(date)"
+              
+              pg_dump -h postgres-service \
+                -U backup_user \
+                -d cicd_platform \
+                -F p \
+                --no-owner \
+                --no-acl \
+                --clean \
+                --if-exists \
+                | gzip > ${BACKUP_FILE}
+              
+              if [ $? -eq 0 ]; then
+                echo "Weekly backup completed successfully: ${BACKUP_FILE}"
+                ls -lh ${BACKUP_FILE}
+                
+                find /backup/weekly -name "*.sql.gz" -type f -mtime +90 -delete
+                echo "Old weekly backups cleaned up"
+              else
+                echo "Weekly backup failed!"
+                exit 1
+              fi
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: backup-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc

@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-node-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kubernetes-node-alerts
+    app.kubernetes.io/component: alerting
+    release: prometheus-operator
+spec:
+  groups:
+    - name: node-alerts
+      interval: 30s
+      rules:
+        - alert: NodeNotReady
+          expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "节点 {{ $labels.node }} 处于 NotReady 状态"
+            description: "节点 {{ $labels.node }} 已经超过 5 分钟处于 NotReady 状态，请立即检查节点状态。"
+
+        - alert: NodeMemoryPressure
+          expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "节点 {{ $labels.node }} 内存压力"
+            description: "节点 {{ $labels.node }} 处于内存压力状态，可能需要增加内存或优化应用。"
+
+        - alert: NodeDiskPressure
+          expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "节点 {{ $labels.node }} 磁盘压力"
+            description: "节点 {{ $labels.node }} 处于磁盘压力状态，请检查磁盘使用情况。"
+
+        - alert: NodeHighCPU
+          expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "节点 {{ $labels.instance }} CPU 使用率过高"
+            description: "节点 {{ $labels.instance }} CPU 使用率超过 80%，当前值为 {{ $value }}%。"
+
+        - alert: NodeHighMemory
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "节点 {{ $labels.instance }} 内存使用率过高"
+            description: "节点 {{ $labels.instance }} 内存使用率超过 85%，当前值为 {{ $value }}%。"
+
+        - alert: NodeDiskRunningLow
+          expr: (node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"}) * 100 < 15
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "节点 {{ $labels.instance }} 磁盘空间不足"
+            description: "节点 {{ $labels.instance }} 根分区剩余空间少于 15%，当前值为 {{ $value }}%。"

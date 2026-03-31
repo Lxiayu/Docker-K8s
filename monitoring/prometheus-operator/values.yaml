@@ -1,0 +1,178 @@
+prometheus:
+  prometheusSpec:
+    replicas: 2
+    retention: 15d
+    retentionSize: "50GB"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    podMonitorSelector: {}
+    ruleSelector: {}
+    additionalScrapeConfigs:
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: (.+):(.+)
+            target_label: __address__
+            replacement: ${1}:9100
+            action: replace
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+    enableAdminAPI: false
+    logLevel: info
+    logFormat: logfmt
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 3
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    alertmanagerConfiguration:
+      name: alertmanager-config
+      global:
+        resolveTimeout: 5m
+    logLevel: info
+
+grafana:
+  replicas: 1
+  persistence:
+    enabled: true
+    storageClassName: standard
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  adminPassword: admin123
+  plugins:
+    - grafana-piechart-panel
+    - grafana-clock-panel
+  additionalDataSources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-operated:9090
+      access: proxy
+      isDefault: true
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      kubernetes-cluster:
+        gnetId: 315
+        revision: 3
+        datasource: Prometheus
+      node-exporter:
+        gnetId: 1860
+        revision: 23
+        datasource: Prometheus
+      pod-monitoring:
+        gnetId: 6417
+        revision: 1
+        datasource: Prometheus
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 3000
+
+prometheusOperator:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  admissionWebhooks:
+    enabled: true
+    failurePolicy: Fail
+
+nodeExporter:
+  enabled: true
+  hostRootfs: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+kubeStateMetrics:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

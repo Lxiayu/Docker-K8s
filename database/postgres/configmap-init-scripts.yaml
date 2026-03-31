@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: database
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cicd-platform
+data:
+  01-init-users.sql: |
+    -- 创建应用数据库
+    CREATE DATABASE cicd_platform
+      WITH 
+      ENCODING = 'UTF8'
+      LC_COLLATE = 'en_US.UTF-8'
+      LC_CTYPE = 'en_US.UTF-8'
+      TEMPLATE = template0;
+    
+    -- 创建只读用户
+    CREATE USER cicd_readonly WITH PASSWORD 'ReadOnly_Pass_2024';
+    GRANT CONNECT ON DATABASE cicd_platform TO cicd_readonly;
+    
+    -- 创建读写用户
+    CREATE USER cicd_readwrite WITH PASSWORD 'ReadWrite_Pass_2024';
+    GRANT CONNECT ON DATABASE cicd_platform TO cicd_readwrite;
+    
+    -- 创建备份用户
+    CREATE USER backup_user WITH PASSWORD 'Backup_Pass_2024';
+    GRANT CONNECT ON DATABASE cicd_platform TO backup_user;
+    
+    -- 创建复制用户
+    CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD 'Repl_Pass_2024';
+    
+    -- 授予管理员权限
+    GRANT ALL PRIVILEGES ON DATABASE cicd_platform TO cicd_admin;
+    
+    \c cicd_platform;
+    
+    -- 授予schema权限
+    GRANT USAGE ON SCHEMA public TO cicd_readonly;
+    GRANT USAGE ON SCHEMA public TO cicd_readwrite;
+    GRANT USAGE ON SCHEMA public TO backup_user;
+    
+    -- 授予表权限
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cicd_readonly;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO cicd_readwrite;
+    
+    -- 授予序列权限
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO cicd_readwrite;
+    
+    -- 授予备份用户权限
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO backup_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO backup_user;
+    
+  02-init-schemas.sql: |
+    \c cicd_platform;
+    
+    -- 创建应用schema
+    CREATE SCHEMA IF NOT EXISTS users;
+    CREATE SCHEMA IF NOT EXISTS pipelines;
+    CREATE SCHEMA IF NOT EXISTS projects;
+    CREATE SCHEMA IF NOT EXISTS deployments;
+    CREATE SCHEMA IF NOT EXISTS audit;
+    
+    -- 授予schema权限
+    GRANT ALL PRIVILEGES ON SCHEMA users TO cicd_admin;
+    GRANT ALL PRIVILEGES ON SCHEMA pipelines TO cicd_admin;
+    GRANT ALL PRIVILEGES ON SCHEMA projects TO cicd_admin;
+    GRANT ALL PRIVILEGES ON SCHEMA deployments TO cicd_admin;
+    GRANT ALL PRIVILEGES ON SCHEMA audit TO cicd_admin;
+    
+    GRANT USAGE ON SCHEMA users TO cicd_readonly;
+    GRANT USAGE ON SCHEMA pipelines TO cicd_readonly;
+    GRANT USAGE ON SCHEMA projects TO cicd_readonly;
+    GRANT USAGE ON SCHEMA deployments TO cicd_readonly;
+    GRANT USAGE ON SCHEMA audit TO cicd_readonly;
+    
+    GRANT USAGE ON SCHEMA users TO cicd_readwrite;
+    GRANT USAGE ON SCHEMA pipelines TO cicd_readwrite;
+    GRANT USAGE ON SCHEMA projects TO cicd_readwrite;
+    GRANT USAGE ON SCHEMA deployments TO cicd_readwrite;
+    GRANT USAGE ON SCHEMA audit TO cicd_readwrite;
+    
+  03-init-tables.sql: |
+    \c cicd_platform;
+    
+    -- 用户表
+    CREATE TABLE IF NOT EXISTS users.users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(100) UNIQUE NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      full_name VARCHAR(200),
+      status VARCHAR(20) DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_login_at TIMESTAMP
+    );
+    
+    -- 角色表
+    CREATE TABLE IF NOT EXISTS users.roles (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) UNIQUE NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- 用户角色关联表
+    CREATE TABLE IF NOT EXISTS users.user_roles (
+      user_id INTEGER REFERENCES users.users(id) ON DELETE CASCADE,
+      role_id INTEGER REFERENCES users.roles(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, role_id)
+    );
+    
+    -- 流水线表
+    CREATE TABLE IF NOT EXISTS pipelines.pipelines (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(200) NOT NULL,
+      description TEXT,
+      project_id INTEGER,
+      repository_url VARCHAR(500),
+      branch VARCHAR(200),
+      config YAML,
+      status VARCHAR(50) DEFAULT 'idle',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- 流水线执行记录表
+    CREATE TABLE IF NOT EXISTS pipelines.executions (
+      id SERIAL PRIMARY KEY,
+      pipeline_id INTEGER REFERENCES pipelines.pipelines(id),
+      trigger_user_id INTEGER REFERENCES users.users(id),
+      trigger_type VARCHAR(50),
+      status VARCHAR(50),
+      started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      finished_at TIMESTAMP,
+      duration INTEGER,
+      logs TEXT
+    );
+    
+    -- 项目表
+    CREATE TABLE IF NOT EXISTS projects.projects (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(200) NOT NULL,
+      description TEXT,
+      git_repository VARCHAR(500),
+      created_by INTEGER REFERENCES users.users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- 部署记录表
+    CREATE TABLE IF NOT EXISTS deployments.deployments (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER REFERENCES projects.projects(id),
+      environment VARCHAR(50),
+      version VARCHAR(100),
+      status VARCHAR(50),
+      deployed_by INTEGER REFERENCES users.users(id),
+      deployed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      rollback_version VARCHAR(100)
+    );
+    
+    -- 审计日志表
+    CREATE TABLE IF NOT EXISTS audit.audit_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users.users(id),
+      action VARCHAR(100) NOT NULL,
+      resource_type VARCHAR(100),
+      resource_id INTEGER,
+      details JSONB,
+      ip_address VARCHAR(50),
+      user_agent TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- 创建索引
+    CREATE INDEX idx_users_username ON users.users(username);
+    CREATE INDEX idx_users_email ON users.users(email);
+    CREATE INDEX idx_pipelines_status ON pipelines.pipelines(status);
+    CREATE INDEX idx_executions_pipeline_id ON pipelines.executions(pipeline_id);
+    CREATE INDEX idx_executions_status ON pipelines.executions(status);
+    CREATE INDEX idx_deployments_project_id ON deployments.deployments(project_id);
+    CREATE INDEX idx_audit_logs_user_id ON audit.audit_logs(user_id);
+    CREATE INDEX idx_audit_logs_created_at ON audit.audit_logs(created_at);
+    
+    -- 授予表权限
+    GRANT SELECT ON ALL TABLES IN SCHEMA users TO cicd_readonly;
+    GRANT SELECT ON ALL TABLES IN SCHEMA pipelines TO cicd_readonly;
+    GRANT SELECT ON ALL TABLES IN SCHEMA projects TO cicd_readonly;
+    GRANT SELECT ON ALL TABLES IN SCHEMA deployments TO cicd_readonly;
+    GRANT SELECT ON ALL TABLES IN SCHEMA audit TO cicd_readonly;
+    
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA users TO cicd_readwrite;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA pipelines TO cicd_readwrite;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA projects TO cicd_readwrite;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA deployments TO cicd_readwrite;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA audit TO cicd_readwrite;
+    
+    GRANT USAGE ON ALL SEQUENCES IN SCHEMA users TO cicd_readwrite;
+    GRANT USAGE ON ALL SEQUENCES IN SCHEMA pipelines TO cicd_readwrite;
+    GRANT USAGE ON ALL SEQUENCES IN SCHEMA projects TO cicd_readwrite;
+    GRANT USAGE ON ALL SEQUENCES IN SCHEMA deployments TO cicd_readwrite;
+    GRANT USAGE ON ALL SEQUENCES IN SCHEMA audit TO cicd_readwrite;

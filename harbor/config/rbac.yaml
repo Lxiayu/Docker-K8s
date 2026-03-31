@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harbor-serviceaccount
+  namespace: harbor-system
+  labels:
+    app: harbor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: harbor-clusterrole
+  labels:
+    app: harbor
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "pods", "pods/log", "services", "endpoints", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificates", "issuers"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: harbor-clusterrolebinding
+  labels:
+    app: harbor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: harbor-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: harbor-serviceaccount
+  namespace: harbor-system

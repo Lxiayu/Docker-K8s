@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: custom-application-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: custom-application-alerts
+    app.kubernetes.io/component: alerting
+    release: prometheus-operator
+spec:
+  groups:
+    - name: application-alerts
+      interval: 30s
+      rules:
+        - alert: ApplicationHighErrorRate
+          expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (namespace, service) / sum(rate(http_requests_total[5m])) by (namespace, service) * 100 > 5
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "应用 {{ $labels.namespace }}/{{ $labels.service }} 错误率过高"
+            description: "应用 {{ $labels.namespace }}/{{ $labels.service }} 的 5xx 错误率超过 5%，当前值为 {{ $value }}%。"
+
+        - alert: ApplicationHighLatency
+          expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (namespace, service, le)) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "应用 {{ $labels.namespace }}/{{ $labels.service }} 延迟过高"
+            description: "应用 {{ $labels.namespace }}/{{ $labels.service }} 的 P95 延迟超过 1 秒，当前值为 {{ $value }}秒。"
+
+        - alert: ApplicationLowThroughput
+          expr: sum(rate(http_requests_total[5m])) by (namespace, service) < 10
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "应用 {{ $labels.namespace }}/{{ $labels.service }} 吞吐量过低"
+            description: "应用 {{ $labels.namespace }}/{{ $labels.service }} 的请求吞吐量低于 10 req/s，当前值为 {{ $value }} req/s。"
+
+        - alert: DatabaseConnectionPoolExhausted
+          expr: db_connection_pool_active / db_connection_pool_max * 100 > 80
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "数据库连接池即将耗尽"
+            description: "数据库连接池使用率超过 80%，当前值为 {{ $value }}%，可能导致应用无法连接数据库。"
+
+        - alert: CacheHitRateLow
+          expr: sum(rate(cache_hits_total[5m])) / sum(rate(cache_requests_total[5m])) * 100 < 50
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "缓存命中率过低"
+            description: "缓存命中率低于 50%，当前值为 {{ $value }}%，可能导致后端数据库压力增大。"
+
+        - alert: MessageQueueBacklog
+          expr: sum(message_queue_messages_unacked) by (queue) > 1000
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "消息队列 {{ $labels.queue }} 积压"
+            description: "消息队列 {{ $labels.queue }} 有超过 1000 条消息未确认，当前值为 {{ $value }}，请检查消费者状态。"

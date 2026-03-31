@@ -1,0 +1,46 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-selfsigned-issuer
+  namespace: harbor-system
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-cert
+  namespace: harbor-system
+spec:
+  secretName: harbor-tls
+  duration: 8760h
+  renewBefore: 360h
+  issuerRef:
+    name: harbor-selfsigned-issuer
+    kind: Issuer
+  commonName: harbor.local
+  dnsNames:
+    - harbor.local
+    - notary.harbor.local
+    - harbor.harbor-system.svc.cluster.local
+    - harbor.harbor-system.svc
+  ipAddresses:
+    - 127.0.0.1
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: notary-cert
+  namespace: harbor-system
+spec:
+  secretName: notary-tls
+  duration: 8760h
+  renewBefore: 360h
+  issuerRef:
+    name: harbor-selfsigned-issuer
+    kind: Issuer
+  commonName: notary.harbor.local
+  dnsNames:
+    - notary.harbor.local
+    - notary.harbor-system.svc.cluster.local
+    - notary.harbor-system.svc
