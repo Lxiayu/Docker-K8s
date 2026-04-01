@@ -21,11 +21,8 @@ import (
 )
 
 func main() {
+	// 优先使用环境变量配置，不依赖本地配置文件
 	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		configPath = "./configs/config.yaml"
-	}
-
 	if err := config.Init(configPath); err != nil {
 		panic(fmt.Sprintf("Failed to initialize config: %v", err))
 	}

@@ -1,0 +1,150 @@
+name: Full CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      action:
+        description: 'Action'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - provision
+          - deploy
+          - rollback
+          - cleanup
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+  provision:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'provision'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create namespace
+        run: |
+          kubectl create namespace cicd-${{ github.event.inputs.environment }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy database
+        run: |
+          kubectl apply -f database/namespace.yaml
+          kubectl apply -f database/postgres/ -n cicd-${{ github.event.inputs.environment }}
+
+      - name: Deploy ingress
+        run: |
+          kubectl apply -f kubernetes/ingress/nginx-ingress.yaml
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'deploy' || github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'deploy' || github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update backend deployment
+        run: |
+          sed -i 's|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}|g' kubernetes/backend-deployment.yaml
+          kubectl apply -f kubernetes/backend-deployment.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Update frontend deployment
+        run: |
+          sed -i 's|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}|g' kubernetes/frontend-deployment.yaml
+          kubectl apply -f kubernetes/frontend-deployment.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Deploy services
+        run: |
+          kubectl apply -f kubernetes/backend-service.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+          kubectl apply -f kubernetes/frontend-service.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+
+  rollback:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'rollback'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Rollback backend
+        run: |
+          kubectl rollout undo deployment/cicd-backend -n cicd-${{ github.event.inputs.environment }}
+
+      - name: Rollback frontend
+        run: |
+          kubectl rollout undo deployment/cicd-frontend -n cicd-${{ github.event.inputs.environment }}
+
+  cleanup:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'cleanup'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cleanup resources
+        run: |
+          kubectl delete namespace cicd-${{ github.event.inputs.environment }} --ignore-not-found
