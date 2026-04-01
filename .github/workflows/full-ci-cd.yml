@@ -211,29 +211,40 @@ jobs:
             -n cicd-${{ needs.setup.outputs.environment }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy backend
+      - name: Deploy using blue-green strategy
         run: |
-          cat kubernetes/backend-deployment.yaml | \
+          # 部署到绿色环境
+          cat kubernetes/backend-blue-green-deployment.yaml | \
             sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}|g" | \
-            sed "s|value: \"postgres\"|value: \"postgres-service.database.svc.cluster.local\"|g" | \
-            sed "s|value: \"localhost\"|value: \"redis-service.database.svc.cluster.local\"|g" | \
             kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
 
-      - name: Deploy frontend
-        run: |
-          cat kubernetes/frontend-deployment.yaml | \
+          # 扩展绿色环境
+          kubectl scale deployment cicd-backend-green --replicas=2 -n cicd-${{ needs.setup.outputs.environment }}
+
+          # 等待绿色环境就绪
+          kubectl rollout status deployment/cicd-backend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+
+          # 切换流量到绿色环境
+          kubectl patch service cicd-backend -n cicd-${{ needs.setup.outputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
+
+          # 前端部署
+          cat kubernetes/frontend-blue-green-deployment.yaml | \
             sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}|g" | \
             kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
 
-      - name: Deploy services
-        run: |
-          kubectl apply -f kubernetes/backend-service.yaml -n cicd-${{ needs.setup.outputs.environment }}
-          kubectl apply -f kubernetes/frontend-service.yaml -n cicd-${{ needs.setup.outputs.environment }}
+          # 扩展前端绿色环境
+          kubectl scale deployment cicd-frontend-green --replicas=2 -n cicd-${{ needs.setup.outputs.environment }}
+
+          # 等待前端绿色环境就绪
+          kubectl rollout status deployment/cicd-frontend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+
+          # 切换前端流量到绿色环境
+          kubectl patch service cicd-frontend -n cicd-${{ needs.setup.outputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
 
       - name: Wait for deployment to be ready
         run: |
-          kubectl rollout status deployment/cicd-backend -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
-          kubectl rollout status deployment/cicd-frontend -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/cicd-backend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/cicd-frontend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
 
       - name: Get deployment status
         run: |
@@ -263,22 +274,26 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Rollback backend
+      - name: Rollback using blue-green strategy
         run: |
-          kubectl rollout undo deployment/cicd-backend -n cicd-${{ github.event.inputs.environment }}
-          kubectl rollout status deployment/cicd-backend -n cicd-${{ github.event.inputs.environment }} --timeout=300s
+          # 切换流量回蓝色环境
+          kubectl patch service cicd-backend -n cicd-${{ github.event.inputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
+          kubectl patch service cicd-frontend -n cicd-${{ github.event.inputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
 
-      - name: Rollback frontend
-        run: |
-          kubectl rollout undo deployment/cicd-frontend -n cicd-${{ github.event.inputs.environment }}
-          kubectl rollout status deployment/cicd-frontend -n cicd-${{ github.event.inputs.environment }} --timeout=300s
+          # 缩容绿色环境
+          kubectl scale deployment cicd-backend-green --replicas=0 -n cicd-${{ github.event.inputs.environment }}
+          kubectl scale deployment cicd-frontend-green --replicas=0 -n cicd-${{ github.event.inputs.environment }}
+
+          # 等待蓝色环境就绪
+          kubectl rollout status deployment/cicd-backend-blue -n cicd-${{ github.event.inputs.environment }} --timeout=300s
+          kubectl rollout status deployment/cicd-frontend-blue -n cicd-${{ github.event.inputs.environment }} --timeout=300s
 
       - name: Verify rollback
         run: |
           echo "=== Rollback Status ==="
           kubectl get pods -n cicd-${{ github.event.inputs.environment }}
-          kubectl describe deployment cicd-backend -n cicd-${{ github.event.inputs.environment }} | grep Image
-          kubectl describe deployment cicd-frontend -n cicd-${{ github.event.inputs.environment }} | grep Image
+          kubectl describe service cicd-backend -n cicd-${{ github.event.inputs.environment }} | grep Selector
+          kubectl describe service cicd-frontend -n cicd-${{ github.event.inputs.environment }} | grep Selector
 
   cleanup:
     needs: setup

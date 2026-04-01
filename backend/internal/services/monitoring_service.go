@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/pkg/logger"
 	"go.uber.org/zap"
 )
 

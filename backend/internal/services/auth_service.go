@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/cicd-platform/backend/internal/middleware"
-	"github.com/cicd-platform/backend/internal/models"
-	"github.com/cicd-platform/backend/pkg/database"
+	"backend/internal/middleware"
+	"backend/internal/models"
+	"backend/pkg/database"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

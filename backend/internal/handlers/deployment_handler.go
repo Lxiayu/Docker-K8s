@@ -3,8 +3,8 @@ package handlers
 import (
 	"strconv"
 
-	"github.com/cicd-platform/backend/internal/services"
-	"github.com/cicd-platform/backend/pkg/response"
+	"backend/internal/services"
+	"backend/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 

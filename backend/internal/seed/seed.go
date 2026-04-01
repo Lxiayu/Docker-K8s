@@ -3,7 +3,7 @@ package seed
 import (
 	"time"
 
-	"github.com/cicd-platform/backend/internal/models"
+	"backend/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

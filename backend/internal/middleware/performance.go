@@ -3,7 +3,7 @@ package middleware
 import (
 	"time"
 
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

@@ -8,9 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/cicd-platform/backend/internal/models"
-	"github.com/cicd-platform/backend/pkg/database"
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/internal/models"
+	"backend/pkg/database"
+	"backend/pkg/logger"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

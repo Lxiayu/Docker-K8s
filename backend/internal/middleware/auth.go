@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cicd-platform/backend/pkg/config"
-	"github.com/cicd-platform/backend/pkg/response"
+	"backend/pkg/config"
+	"backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )

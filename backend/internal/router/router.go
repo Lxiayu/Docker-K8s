@@ -1,9 +1,11 @@
 package router
 
 import (
-	"github.com/cicd-platform/backend/internal/handlers"
-	"github.com/cicd-platform/backend/internal/middleware"
+	"backend/internal/handlers"
+	"backend/internal/middleware"
 	"github.com/gin-gonic/gin"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/swaggo/files"
 )
 
 func Setup(engine *gin.Engine) {
@@ -18,6 +20,9 @@ func Setup(engine *gin.Engine) {
 			"status": "ready",
 		})
 	})
+
+	// Swagger 文档路由
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := engine.Group("/api/v1")
 	{
