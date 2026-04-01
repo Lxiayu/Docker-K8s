@@ -557,10 +557,21 @@ func (s *K8sService) DeployToK8s(id uint, req *DeployRequest, userID uint) (*mod
 		return nil, err
 	}
 
+	// 更新状态为部署中
 	deployment.Status = "deploying"
 	if err := database.Get().Save(deployment).Error; err != nil {
 		return nil, err
 	}
+
+	// 实际的部署操作由GitHub Actions处理
+	// 这里只是更新状态
+	
+	// 模拟部署完成
+	go func() {
+		time.Sleep(2 * time.Second)
+		deployment.Status = "running"
+		database.Get().Save(deployment)
+	}()
 
 	return deployment, nil
 }
@@ -571,10 +582,21 @@ func (s *K8sService) RollbackDeploymentRecord(id uint, req *RollbackRequest, use
 		return nil, err
 	}
 
+	// 更新状态为回滚中
 	deployment.Status = "rolling_back"
 	if err := database.Get().Save(deployment).Error; err != nil {
 		return nil, err
 	}
+
+	// 实际的回滚操作由GitHub Actions处理
+	// 这里只是更新状态
+	
+	// 模拟回滚完成
+	go func() {
+		time.Sleep(2 * time.Second)
+		deployment.Status = "running"
+		database.Get().Save(deployment)
+	}()
 
 	return deployment, nil
 }

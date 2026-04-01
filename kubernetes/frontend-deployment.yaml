@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-frontend
+  labels:
+    app: cicd-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cicd-frontend
+  template:
+    metadata:
+      labels:
+        app: cicd-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: ghcr.io/${{ github.repository_owner }}/cicd-frontend:IMAGE_TAG
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cicd-frontend
+  labels:
+    app: cicd-frontend
+spec:
+  selector:
+    app: cicd-frontend
+  ports:
+  - port: 80
+    targetPort: 80
+  type: LoadBalancer
