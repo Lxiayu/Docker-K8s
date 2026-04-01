@@ -16,6 +16,7 @@ import (
 	"github.com/cicd-platform/backend/pkg/config"
 	"github.com/cicd-platform/backend/pkg/database"
 	"github.com/cicd-platform/backend/pkg/logger"
+	"github.com/cicd-platform/backend/pkg/redis"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -55,12 +56,19 @@ func main() {
 		logger.Error("Failed to seed database", zap.Error(err))
 	}
 
+	// 初始化Redis
+	if err := redis.Init(&cfg.Redis); err != nil {
+		logger.Fatal("Failed to initialize Redis", zap.Error(err))
+	}
+	defer redis.Close()
+
 	gin.SetMode(cfg.Server.Mode)
 
 	engine := gin.New()
 	engine.Use(
 		middleware.Recovery(),
 		middleware.Logger(),
+		middleware.PerformanceMonitor(),
 		middleware.CORS(),
 	)
 

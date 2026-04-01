@@ -86,9 +86,18 @@ jobs:
         run: |
           kubectl apply -f database/postgres/ -n database
 
+      - name: Deploy Redis
+        run: |
+          kubectl apply -f kubernetes/redis-deployment.yaml
+          kubectl apply -f kubernetes/redis-service.yaml
+
       - name: Wait for database to be ready
         run: |
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql -n database --timeout=300s
+
+      - name: Wait for Redis to be ready
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis -n database --timeout=300s
 
       - name: Deploy ingress
         run: |
@@ -111,6 +120,18 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Backend security scan
+        run: |
+          cd backend
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -fmt=json -out=gosec-report.json ./...
+
+      - name: Frontend security scan
+        run: |
+          cd frontend
+          npm ci
+          npm audit --json > npm-audit-report.json || true
+
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
@@ -132,6 +153,32 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Docker image security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}'
+          format: 'json'
+          output: 'trivy-backend-report.json'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Docker image security scan (frontend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}'
+          format: 'json'
+          output: 'trivy-frontend-report.json'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload security scan reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-reports
+          path: |
+            backend/gosec-report.json
+            frontend/npm-audit-report.json
+            trivy-backend-report.json
+            trivy-frontend-report.json
 
   deploy:
     needs: [setup, build]
@@ -169,6 +216,7 @@ jobs:
           cat kubernetes/backend-deployment.yaml | \
             sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}|g" | \
             sed "s|value: \"postgres\"|value: \"postgres-service.database.svc.cluster.local\"|g" | \
+            sed "s|value: \"localhost\"|value: \"redis-service.database.svc.cluster.local\"|g" | \
             kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
 
       - name: Deploy frontend

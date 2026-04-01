@@ -42,6 +42,14 @@ spec:
               key: secret
         - name: LOG_LEVEL
           value: "info"
+        - name: REDIS_HOST
+          value: "redis-service.database.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          value: ""
+        - name: REDIS_DB
+          value: "0"
         resources:
           requests:
             cpu: "100m"

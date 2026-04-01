@@ -22,5 +22,13 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.ts',
+      coverage: {
+        reporter: ['text', 'json', 'html'],
+      },
+      globals: true,
+    },
   }
 })
