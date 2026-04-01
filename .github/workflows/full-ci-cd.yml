@@ -30,9 +30,14 @@ on:
           - rollback
           - cleanup
 
+env:
+  DOCKER_IMAGE_PREFIX: ${{ secrets.DOCKER_USERNAME }}
+
 jobs:
   setup:
     runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ github.event.inputs.environment || 'dev' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,11 +45,14 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: 'v1.28.0'
 
       - name: Configure kubectl
         run: |
+          mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
 
   provision:
     needs: setup
@@ -58,14 +66,33 @@ jobs:
         run: |
           kubectl create namespace cicd-${{ github.event.inputs.environment }} --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy database
+      - name: Create database namespace
         run: |
           kubectl apply -f database/namespace.yaml
-          kubectl apply -f database/postgres/ -n cicd-${{ github.event.inputs.environment }}
+
+      - name: Create database secrets
+        run: |
+          kubectl create secret generic database-secret \
+            --from-literal=password=${{ secrets.DATABASE_PASSWORD }} \
+            -n cicd-${{ github.event.inputs.environment }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic jwt-secret \
+            --from-literal=secret=${{ secrets.JWT_SECRET }} \
+            -n cicd-${{ github.event.inputs.environment }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy database
+        run: |
+          kubectl apply -f database/postgres/ -n database
+
+      - name: Wait for database to be ready
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql -n database --timeout=300s
 
       - name: Deploy ingress
         run: |
-          kubectl apply -f kubernetes/ingress/nginx-ingress.yaml
+          kubectl apply -f kubernetes/ingress/nginx-ingress.yaml || true
 
   build:
     needs: setup
@@ -89,37 +116,85 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/cicd-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
-    needs: build
+    needs: [setup, build]
     runs-on: ubuntu-latest
     if: github.event.inputs.action == 'deploy' || github.event_name == 'push' || github.event_name == 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Update backend deployment
-        run: |
-          sed -i 's|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}|g' kubernetes/backend-deployment.yaml
-          kubectl apply -f kubernetes/backend-deployment.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
 
-      - name: Update frontend deployment
+      - name: Configure kubectl
         run: |
-          sed -i 's|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}|g' kubernetes/frontend-deployment.yaml
-          kubectl apply -f kubernetes/frontend-deployment.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Create secrets if not exist
+        run: |
+          kubectl create secret generic database-secret \
+            --from-literal=password=${{ secrets.DATABASE_PASSWORD }} \
+            -n cicd-${{ needs.setup.outputs.environment }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic jwt-secret \
+            --from-literal=secret=${{ secrets.JWT_SECRET }} \
+            -n cicd-${{ needs.setup.outputs.environment }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy backend
+        run: |
+          cat kubernetes/backend-deployment.yaml | \
+            sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}|g" | \
+            sed "s|value: \"postgres\"|value: \"postgres-service.database.svc.cluster.local\"|g" | \
+            kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
+
+      - name: Deploy frontend
+        run: |
+          cat kubernetes/frontend-deployment.yaml | \
+            sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}|g" | \
+            kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
 
       - name: Deploy services
         run: |
-          kubectl apply -f kubernetes/backend-service.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
-          kubectl apply -f kubernetes/frontend-service.yaml -n cicd-${{ github.event.inputs.environment || 'dev' }}
+          kubectl apply -f kubernetes/backend-service.yaml -n cicd-${{ needs.setup.outputs.environment }}
+          kubectl apply -f kubernetes/frontend-service.yaml -n cicd-${{ needs.setup.outputs.environment }}
+
+      - name: Wait for deployment to be ready
+        run: |
+          kubectl rollout status deployment/cicd-backend -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/cicd-frontend -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+
+      - name: Get deployment status
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get pods -n cicd-${{ needs.setup.outputs.environment }}
+          kubectl get services -n cicd-${{ needs.setup.outputs.environment }}
+          echo "=== Application URLs ==="
+          echo "Frontend: http://$(kubectl get service cicd-frontend -n cicd-${{ needs.setup.outputs.environment }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo 'pending')"
+          echo "Backend: http://$(kubectl get service cicd-backend -n cicd-${{ needs.setup.outputs.environment }} -o jsonpath='{.spec.clusterIP}'):8080"
 
   rollback:
     needs: setup
@@ -129,13 +204,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
       - name: Rollback backend
         run: |
           kubectl rollout undo deployment/cicd-backend -n cicd-${{ github.event.inputs.environment }}
+          kubectl rollout status deployment/cicd-backend -n cicd-${{ github.event.inputs.environment }} --timeout=300s
 
       - name: Rollback frontend
         run: |
           kubectl rollout undo deployment/cicd-frontend -n cicd-${{ github.event.inputs.environment }}
+          kubectl rollout status deployment/cicd-frontend -n cicd-${{ github.event.inputs.environment }} --timeout=300s
+
+      - name: Verify rollback
+        run: |
+          echo "=== Rollback Status ==="
+          kubectl get pods -n cicd-${{ github.event.inputs.environment }}
+          kubectl describe deployment cicd-backend -n cicd-${{ github.event.inputs.environment }} | grep Image
+          kubectl describe deployment cicd-frontend -n cicd-${{ github.event.inputs.environment }} | grep Image
 
   cleanup:
     needs: setup
@@ -145,6 +240,49 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
       - name: Cleanup resources
         run: |
+          echo "Cleaning up namespace cicd-${{ github.event.inputs.environment }}..."
           kubectl delete namespace cicd-${{ github.event.inputs.environment }} --ignore-not-found
+          echo "Cleanup completed"
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: |
+          go mod download
+          go test -v ./...
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run test || true

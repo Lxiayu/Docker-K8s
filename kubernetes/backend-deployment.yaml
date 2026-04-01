@@ -16,18 +16,18 @@ spec:
     spec:
       containers:
       - name: backend
-        image: ghcr.io/${{ github.repository_owner }}/cicd-backend:IMAGE_TAG
+        image: docker.io/USERNAME/cicd-backend:latest
         ports:
         - containerPort: 8080
         env:
         - name: SERVER_PORT
           value: "8080"
         - name: DATABASE_HOST
-          value: "postgres"
+          value: "postgres-service.database.svc.cluster.local"
         - name: DATABASE_PORT
           value: "5432"
         - name: DATABASE_USER
-          value: "cicd"
+          value: "cicd_admin"
         - name: DATABASE_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -53,11 +53,15 @@ spec:
           httpGet:
             path: /ready
             port: 8080
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         livenessProbe:
           httpGet:
             path: /health
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
