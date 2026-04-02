@@ -3,8 +3,8 @@ package database
 import (
 	"fmt"
 
-	"github.com/cicd-platform/backend/pkg/config"
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/pkg/config"
+	"backend/pkg/logger"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

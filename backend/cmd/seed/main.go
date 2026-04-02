@@ -5,11 +5,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/cicd-platform/backend/internal/models"
-	"github.com/cicd-platform/backend/internal/seed"
-	"github.com/cicd-platform/backend/pkg/config"
-	"github.com/cicd-platform/backend/pkg/database"
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/internal/models"
+	"backend/internal/seed"
+	"backend/pkg/config"
+	"backend/pkg/database"
+	"backend/pkg/logger"
 )
 
 func main() {

@@ -9,23 +9,43 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cicd-platform/backend/internal/middleware"
-	"github.com/cicd-platform/backend/internal/models"
-	"github.com/cicd-platform/backend/internal/router"
-	"github.com/cicd-platform/backend/internal/seeder"
-	"github.com/cicd-platform/backend/pkg/config"
-	"github.com/cicd-platform/backend/pkg/database"
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/internal/middleware"
+	"backend/internal/models"
+	"backend/internal/router"
+	"backend/internal/seeder"
+	"backend/pkg/config"
+	"backend/pkg/database"
+	"backend/pkg/logger"
+	"backend/pkg/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/swaggo/gin-swagger"
+	"github.com/swaggo/files"
 	"go.uber.org/zap"
 )
 
-func main() {
-	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		configPath = "./configs/config.yaml"
-	}
+// @title CI/CD Platform API
+// @version 1.0
+// @description CI/CD Platform API Documentation
+// @termsOfService http://swagger.io/terms/
 
+// @contact.name API Support
+// @contact.url http://www.example.com/support
+// @contact.email support@example.com
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /api/v1
+// @schemes http https
+
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+
+func main() {
+	// 优先使用环境变量配置，不依赖本地配置文件
+	configPath := os.Getenv("CONFIG_PATH")
 	if err := config.Init(configPath); err != nil {
 		panic(fmt.Sprintf("Failed to initialize config: %v", err))
 	}
@@ -58,12 +78,19 @@ func main() {
 		logger.Error("Failed to seed database", zap.Error(err))
 	}
 
+	// 初始化Redis
+	if err := redis.Init(&cfg.Redis); err != nil {
+		logger.Fatal("Failed to initialize Redis", zap.Error(err))
+	}
+	defer redis.Close()
+
 	gin.SetMode(cfg.Server.Mode)
 
 	engine := gin.New()
 	engine.Use(
 		middleware.Recovery(),
 		middleware.Logger(),
+		middleware.PerformanceMonitor(),
 		middleware.CORS(),
 	)
 

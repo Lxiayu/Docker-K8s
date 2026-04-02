@@ -3,15 +3,76 @@ package handlers
 import (
 	"strconv"
 
-	"github.com/cicd-platform/backend/internal/middleware"
-	"github.com/cicd-platform/backend/internal/services"
-	"github.com/cicd-platform/backend/pkg/response"
+	"backend/internal/middleware"
+	"backend/internal/services"
+	"backend/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 var authService = services.NewAuthService()
 var userService = services.NewUserService()
 var rbacService = services.NewRBACService()
+
+// Login godoc
+// @Summary 用户登录
+// @Description 用户登录并获取认证令牌
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Param request body services.LoginRequest true "登录请求"
+// @Success 200 {object} response.Response{data=services.LoginResponse} "登录成功"
+// @Failure 400 {object} response.Response "请求参数错误"
+// @Failure 401 {object} response.Response "登录失败"
+// @Router /api/v1/auth/login [post]
+
+// Register godoc
+// @Summary 用户注册
+// @Description 注册新用户
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Param request body services.RegisterRequest true "注册请求"
+// @Success 200 {object} response.Response{data=services.User} "注册成功"
+// @Failure 400 {object} response.Response "请求参数错误"
+// @Router /api/v1/auth/register [post]
+
+// GetCurrentUser godoc
+// @Summary 获取当前用户
+// @Description 获取当前登录用户的信息
+// @Tags 用户
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} response.Response{data=services.User} "获取成功"
+// @Failure 401 {object} response.Response "未授权"
+// @Failure 404 {object} response.Response "用户不存在"
+// @Router /api/v1/users/me [get]
+
+// UpdateProfile godoc
+// @Summary 更新个人资料
+// @Description 更新当前登录用户的个人资料
+// @Tags 用户
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body services.UpdateProfileRequest true "更新请求"
+// @Success 200 {object} response.Response{data=services.User} "更新成功"
+// @Failure 400 {object} response.Response "请求参数错误"
+// @Failure 401 {object} response.Response "未授权"
+// @Router /api/v1/users/me [put]
+
+// ChangePassword godoc
+// @Summary 修改密码
+// @Description 修改当前登录用户的密码
+// @Tags 用户
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body services.ChangePasswordRequest true "修改密码请求"
+// @Success 200 {object} response.Response "修改成功"
+// @Failure 400 {object} response.Response "请求参数错误"
+// @Failure 401 {object} response.Response "未授权"
+// @Router /api/v1/users/me/password [put]
 
 func Login(c *gin.Context) {
 	var req services.LoginRequest

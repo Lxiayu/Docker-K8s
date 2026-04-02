@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"github.com/cicd-platform/backend/pkg/logger"
-	"github.com/cicd-platform/backend/pkg/response"
+	"backend/pkg/logger"
+	"backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

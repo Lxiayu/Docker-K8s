@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cicd-platform/backend/internal/models"
-	"github.com/cicd-platform/backend/pkg/database"
-	"github.com/cicd-platform/backend/pkg/logger"
+	"backend/internal/models"
+	"backend/pkg/database"
+	"backend/pkg/logger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

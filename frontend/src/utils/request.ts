@@ -16,7 +16,7 @@ interface PageData<T = unknown> {
 }
 
 const axiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
 })
 

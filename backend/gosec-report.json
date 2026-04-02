@@ -1,0 +1,241 @@
+{
+	"Golang errors": {
+		"/workspace/backend/cmd/server/main.go": [
+			{
+				"line": 19,
+				"column": 2,
+				"error": "could not import backend/pkg/redis (invalid package name: \"\")"
+			},
+			{
+				"line": 21,
+				"column": 2,
+				"error": "could not import github.com/swaggo/gin-swagger (invalid package name: \"\")"
+			},
+			{
+				"line": 22,
+				"column": 2,
+				"error": "could not import github.com/swaggo/files (invalid package name: \"\")"
+			}
+		],
+		"/workspace/backend/docs/docs.go": [
+			{
+				"line": 4,
+				"column": 8,
+				"error": "could not import github.com/swaggo/swag (invalid package name: \"\")"
+			}
+		],
+		"/workspace/backend/internal/router/router.go": [
+			{
+				"line": 7,
+				"column": 13,
+				"error": "could not import github.com/swaggo/gin-swagger (invalid package name: \"\")"
+			},
+			{
+				"line": 8,
+				"column": 15,
+				"error": "could not import github.com/swaggo/files (invalid package name: \"\")"
+			}
+		]
+	},
+	"Issues": [
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "78",
+				"url": "https://cwe.mitre.org/data/definitions/78.html"
+			},
+			"rule_id": "G204",
+			"details": "Subprocess launched with variable",
+			"file": "/workspace/backend/internal/services/build_service.go",
+			"code": "257: func (s *BuildService) PushImage(imageName string) error {\n258: \tcmd := exec.Command(\"docker\", \"push\", imageName)\n259: \toutput, err := cmd.CombinedOutput()\n",
+			"line": "258",
+			"column": "9",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "78",
+				"url": "https://cwe.mitre.org/data/definitions/78.html"
+			},
+			"rule_id": "G204",
+			"details": "Subprocess launched with variable",
+			"file": "/workspace/backend/internal/services/build_service.go",
+			"code": "220: func (s *BuildService) GetImageSize(imageName string) (int64, error) {\n221: \tcmd := exec.Command(\"docker\", \"image\", \"inspect\", imageName, \"--format\", \"{{.Size}}\")\n222: \toutput, err := cmd.Output()\n",
+			"line": "221",
+			"column": "9",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "118",
+				"url": "https://cwe.mitre.org/data/definitions/118.html"
+			},
+			"rule_id": "G601",
+			"details": "Implicit memory aliasing in for loop.",
+			"file": "/workspace/backend/internal/services/k8s_service.go",
+			"code": "681: \n682: \t\tcpu, memory := s.getPodResourceUsage(\u0026pod)\n683: \t\tpodInfo.CPU = cpu\n",
+			"line": "682",
+			"column": "40",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "118",
+				"url": "https://cwe.mitre.org/data/definitions/118.html"
+			},
+			"rule_id": "G601",
+			"details": "Implicit memory aliasing in for loop.",
+			"file": "/workspace/backend/internal/services/k8s_service.go",
+			"code": "677: \t\t\tLabels:    pod.Labels,\n678: \t\t\tRestarts:  s.getPodRestarts(\u0026pod),\n679: \t\t\tAge:       formatAge(pod.CreationTimestamp.Time),\n",
+			"line": "678",
+			"column": "32",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "118",
+				"url": "https://cwe.mitre.org/data/definitions/118.html"
+			},
+			"rule_id": "G601",
+			"details": "Implicit memory aliasing in for loop.",
+			"file": "/workspace/backend/internal/services/k8s_service.go",
+			"code": "674: \t\t\tStatus:    string(pod.Status.Phase),\n675: \t\t\tReady:     s.getReadyContainers(\u0026pod),\n676: \t\t\tIP:        pod.Status.PodIP,\n",
+			"line": "675",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/notification_service.go",
+			"code": "237: \t\t}\n238: \t\ts.SendEmail(emailConfig)\n239: \t}\n",
+			"line": "238",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/notification_service.go",
+			"code": "219: \t\t}\n220: \t\ts.SendEmail(emailConfig)\n221: \t}\n",
+			"line": "220",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/notification_service.go",
+			"code": "201: \t\t}\n202: \t\ts.SendEmail(emailConfig)\n203: \t}\n",
+			"line": "202",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/monitoring_service.go",
+			"code": "212: \t\t\tvar rate float64\n213: \t\t\tfmt.Sscanf(val, \"%f\", \u0026rate)\n214: \t\t\treturn rate * 100, nil // Convert to percentage\n",
+			"line": "213",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/monitoring_service.go",
+			"code": "193: \t\t\tvar rate float64\n194: \t\t\tfmt.Sscanf(val, \"%f\", \u0026rate)\n195: \t\t\treturn rate, nil\n",
+			"line": "194",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/monitoring_service.go",
+			"code": "155: \t\t\t\tvar memUsage float64\n156: \t\t\t\tfmt.Sscanf(val, \"%f\", \u0026memUsage)\n157: \t\t\t\tusage[pod] = memUsage / 1024 / 1024 // Convert to MB\n",
+			"line": "156",
+			"column": "5",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/workspace/backend/internal/services/monitoring_service.go",
+			"code": "132: \t\t\t\tvar cpuUsage float64\n133: \t\t\t\tfmt.Sscanf(val, \"%f\", \u0026cpuUsage)\n134: \t\t\t\tusage[pod] = cpuUsage\n",
+			"line": "133",
+			"column": "5",
+			"nosec": false,
+			"suppressions": null
+		}
+	],
+	"Stats": {
+		"files": 39,
+		"lines": 6362,
+		"nosec": 0,
+		"found": 12
+	},
+	"GosecVersion": "dev"
+}

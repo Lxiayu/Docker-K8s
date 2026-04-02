@@ -1,0 +1,176 @@
+# 金丝雀部署配置
+
+# 主版本部署 (稳定版)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-backend-stable
+  labels:
+    app: cicd-backend
+    version: stable
+spec:
+  replicas: 3  # 稳定版占大部分实例
+  selector:
+    matchLabels:
+      app: cicd-backend
+      version: stable
+  template:
+    metadata:
+      labels:
+        app: cicd-backend
+        version: stable
+    spec:
+      containers:
+      - name: backend
+        image: docker.io/USERNAME/cicd-backend:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SERVER_PORT
+          value: "8080"
+        - name: DATABASE_HOST
+          value: "postgres-service.database.svc.cluster.local"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_USER
+          value: "cicd_admin"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: password
+        - name: DATABASE_NAME
+          value: "cicd_platform"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_HOST
+          value: "redis-service.database.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          value: ""
+        - name: REDIS_DB
+          value: "0"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+---
+# 金丝雀版本部署 (新版本)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-backend-canary
+  labels:
+    app: cicd-backend
+    version: canary
+spec:
+  replicas: 1  # 金丝雀版本只占少数实例
+  selector:
+    matchLabels:
+      app: cicd-backend
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: cicd-backend
+        version: canary
+    spec:
+      containers:
+      - name: backend
+        image: docker.io/USERNAME/cicd-backend:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SERVER_PORT
+          value: "8080"
+        - name: DATABASE_HOST
+          value: "postgres-service.database.svc.cluster.local"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_USER
+          value: "cicd_admin"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: password
+        - name: DATABASE_NAME
+          value: "cicd_platform"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_HOST
+          value: "redis-service.database.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          value: ""
+        - name: REDIS_DB
+          value: "0"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+---
+# 服务配置 - 使用权重分配流量
+apiVersion: v1
+kind: Service
+metadata:
+  name: cicd-backend
+  labels:
+    app: cicd-backend
+spec:
+  selector:
+    app: cicd-backend
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP

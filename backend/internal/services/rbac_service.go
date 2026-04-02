@@ -3,8 +3,8 @@ package services
 import (
 	"errors"
 
-	"github.com/cicd-platform/backend/internal/models"
-	"github.com/cicd-platform/backend/pkg/database"
+	"backend/internal/models"
+	"backend/pkg/database"
 	"gorm.io/gorm"
 )
 
