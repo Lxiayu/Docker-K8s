@@ -7,10 +7,12 @@ import (
 	"backend/internal/handlers"
 	"backend/internal/middleware"
 	"backend/pkg/database"
+	"backend/pkg/logger"
 	"backend/pkg/redis"
 	"github.com/gin-gonic/gin"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
+	"go.uber.org/zap"
 )
 
 var startTime = time.Now()
@@ -29,9 +31,16 @@ func Setup(engine *gin.Engine) {
 		dbErr := database.Ping()
 		redisErr := redis.Ping()
 
+		if dbErr != nil {
+			logger.Error("Database connection failed", zap.Error(dbErr))
+		}
+		if redisErr != nil {
+			logger.Error("Redis connection failed", zap.Error(redisErr))
+		}
+
 		if dbErr != nil || redisErr != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status": "not ready",
+				"status":   "not ready",
 				"database": dbErr == nil,
 				"redis":    redisErr == nil,
 			})

@@ -110,8 +110,18 @@ func Init(configPath string) error {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
+		dbPassword := GlobalConfig.Database.Password
+		jwtSecret := GlobalConfig.JWT.Secret
+
 		if err := viper.Unmarshal(GlobalConfig); err != nil {
 			return fmt.Errorf("failed to unmarshal config: %w", err)
+		}
+
+		if GlobalConfig.Database.Password == "" {
+			GlobalConfig.Database.Password = dbPassword
+		}
+		if GlobalConfig.JWT.Secret == "" {
+			GlobalConfig.JWT.Secret = jwtSecret
 		}
 	}
 
