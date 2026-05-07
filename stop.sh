@@ -29,6 +29,15 @@ stop_backend() {
         PID=$(cat "$PID_DIR/backend.pid")
         if kill -0 "$PID" 2>/dev/null; then
             kill "$PID"
+            for i in $(seq 1 10); do
+                if ! kill -0 $PID 2>/dev/null; then
+                    break
+                fi
+                sleep 1
+            done
+            if kill -0 $PID 2>/dev/null; then
+                kill -9 $PID 2>/dev/null
+            fi
             echo -e "  ${GREEN}✓${NC} 后端服务已停止 (PID: $PID)"
         else
             echo -e "  ${YELLOW}!${NC} 后端服务未运行"
@@ -48,6 +57,15 @@ stop_frontend() {
         PID=$(cat "$PID_DIR/frontend.pid")
         if kill -0 "$PID" 2>/dev/null; then
             kill "$PID"
+            for i in $(seq 1 10); do
+                if ! kill -0 $PID 2>/dev/null; then
+                    break
+                fi
+                sleep 1
+            done
+            if kill -0 $PID 2>/dev/null; then
+                kill -9 $PID 2>/dev/null
+            fi
             echo -e "  ${GREEN}✓${NC} 前端服务已停止 (PID: $PID)"
         else
             echo -e "  ${YELLOW}!${NC} 前端服务未运行"

@@ -39,8 +39,8 @@ export const pipelineApi = {
   delete: (id: number): Promise<void> =>
     request.delete(`/pipelines/${id}`),
   
-  trigger: (id: number): Promise<{ build_id: string; status: string }> =>
-    request.post(`/pipelines/${id}/trigger`),
+  trigger: (id: number, params?: { branch?: string }): Promise<{ build_id: string; status: string }> =>
+    request.post(`/pipelines/${id}/trigger`, params),
   
   listBuilds: (id: number, params: { page?: number; page_size?: number }): Promise<PageData<Build>> =>
     request.get(`/pipelines/${id}/builds`, { params }),

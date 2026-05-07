@@ -143,4 +143,4 @@ gc:
   deleteUntagged: true
 
 auditLog:
-  enabled: false
+  enabled: true

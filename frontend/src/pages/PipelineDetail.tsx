@@ -138,7 +138,7 @@ export default function PipelineDetail() {
   )
 
   const triggerMutation = useMutation(
-    () => pipelineApi.trigger(pipelineId),
+    () => pipelineApi.trigger(pipelineId, { branch: triggerBranch }),
     {
       onSuccess: () => {
         toast.success('构建已触发')
@@ -174,7 +174,7 @@ export default function PipelineDetail() {
   }
 
   const handleTriggerBuild = () => {
-    triggerMutation.mutate()
+    triggerMutation.mutate(undefined)
   }
 
   if (pipelineLoading) {

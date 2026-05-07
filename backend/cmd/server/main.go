@@ -18,8 +18,6 @@ import (
 	"backend/pkg/logger"
 	"backend/pkg/redis"
 	"github.com/gin-gonic/gin"
-	"github.com/swaggo/gin-swagger"
-	"github.com/swaggo/files"
 	"go.uber.org/zap"
 )
 

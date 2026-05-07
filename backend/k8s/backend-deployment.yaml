@@ -34,7 +34,9 @@ data:
       host: postgres.database.svc.cluster.local
       port: 5432
       user: cicd
-      password: cicd123
+      # NOTE: In production, use environment variables or K8s Secrets
+      # This ConfigMap is for development only
+      password: "${POSTGRES_PASSWORD}"
       dbname: cicd_platform
       sslmode: disable
       max_open_conns: 100
@@ -48,7 +50,8 @@ data:
       db: 0
     
     jwt:
-      secret: your-secret-key-change-in-production
+      # NOTE: In production, use environment variables or K8s Secrets
+      secret: "${JWT_SECRET}"
       expire_time: 24h
     
     log:
@@ -76,8 +79,17 @@ spec:
       labels:
         app: backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
-      - name: backend
+      - name: cicd-backend
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop: ["ALL"]
         image: harbor.local/cicd-platform/backend:latest
         imagePullPolicy: Always
         ports:

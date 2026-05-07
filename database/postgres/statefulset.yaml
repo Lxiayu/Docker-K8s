@@ -21,8 +21,17 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/part-of: cicd-platform
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
       containers:
       - name: postgres
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop: ["ALL"]
         image: postgres:15.4-alpine
         ports:
         - containerPort: 5432

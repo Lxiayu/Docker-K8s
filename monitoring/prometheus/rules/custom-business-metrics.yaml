@@ -9,59 +9,72 @@ metadata:
     release: prometheus-operator
 spec:
   groups:
-    - name: business-metrics
-      interval: 30s
-      rules:
-        - alert: OrderProcessingSlow
-          expr: histogram_quantile(0.95, sum(rate(order_processing_duration_seconds_bucket[5m])) by (le)) > 30
-          for: 10m
-          labels:
-            severity: warning
-          annotations:
-            summary: "订单处理速度过慢"
-            description: "订单处理的 P95 延迟超过 30 秒，当前值为 {{ $value }}秒，可能影响用户体验。"
+  - name: cicd-platform-alerts
+    rules:
+      - alert: HighBuildFailureRate
+        expr: |
+          sum(rate(pipeline_build_total{status="failed"}[5m])) /
+          sum(rate(pipeline_build_total[5m])) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "流水线构建失败率过高"
+          description: "过去5分钟构建失败率超过30%，当前值: {{ $value | humanizePercentage }}"
 
-        - alert: PaymentFailureRateHigh
-          expr: sum(rate(payment_requests_total{status="failed"}[5m])) / sum(rate(payment_requests_total[5m])) * 100 > 5
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: "支付失败率过高"
-            description: "支付失败率超过 5%，当前值为 {{ $value }}%，请立即检查支付网关状态。"
+      - alert: BuildDurationTooLong
+        expr: |
+          histogram_quantile(0.95, sum(rate(pipeline_build_duration_seconds_bucket[5m])) by (le)) > 600
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "构建耗时过长"
+          description: "P95 构建耗时超过10分钟，当前值: {{ $value }}s"
 
-        - alert: UserRegistrationDrop
-          expr: sum(rate(user_registrations_total[1h])) < sum(rate(user_registrations_total[1h] offset 24h)) * 0.5
-          for: 1h
-          labels:
-            severity: warning
-          annotations:
-            summary: "用户注册量异常下降"
-            description: "过去 1 小时的用户注册量比昨天同时段下降了超过 50%，请检查注册流程是否正常。"
+      - alert: DeploymentFailureRateHigh
+        expr: |
+          sum(rate(deployment_total{status="failed"}[10m])) /
+          sum(rate(deployment_total[10m])) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "部署失败率过高"
+          description: "过去10分钟部署失败率超过20%"
 
-        - alert: APIResponseTimeSLA
-          expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
-          for: 15m
-          labels:
-            severity: warning
-          annotations:
-            summary: "API 响应时间违反 SLA"
-            description: "API 的 P99 响应时间超过 2 秒，当前值为 {{ $value }}秒，违反了 SLA 要求。"
+      - alert: ImageBuildStuck
+        expr: time() - image_build_start_time_seconds > 1800
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "镜像构建可能卡住"
+          description: "镜像构建已运行超过30分钟"
 
-    - name: business-recording-rules
-      interval: 30s
-      rules:
-        - record: business:orders_per_minute
-          expr: sum(rate(order_requests_total[1m])) * 60
+      - alert: HighAPIErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) /
+          sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "API 5xx 错误率过高"
+          description: "过去5分钟 API 5xx 错误率超过5%"
 
-        - record: business:revenue_per_hour
-          expr: sum(rate(revenue_total[1h]))
-
-        - record: business:active_users
-          expr: sum(active_user_sessions)
-
-        - record: business:conversion_rate
-          expr: sum(rate(purchases_total[1h])) / sum(rate(page_views_total[1h])) * 100
-
-        - record: business:average_order_value
-          expr: sum(rate(revenue_total[1h])) / sum(rate(purchases_total[1h]))
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "API 响应延迟过高"
+          description: "P95 API 响应时间超过2秒，方法: {{ $labels.method }}"

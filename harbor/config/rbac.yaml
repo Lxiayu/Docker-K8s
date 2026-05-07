@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: harbor-serviceaccount
-  namespace: harbor-system
+  namespace: harbor
   labels:
     app: harbor
 ---
@@ -42,4 +42,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: harbor-serviceaccount
-  namespace: harbor-system
+  namespace: harbor

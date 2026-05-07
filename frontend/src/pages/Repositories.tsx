@@ -78,33 +78,6 @@ export default function Repositories() {
     () => repositoryApi.list({ page, page_size: pageSize })
   )
 
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <div className="text-center">
-          <h3 className="text-lg font-semibold">加载失败</h3>
-          <p className="text-muted-foreground mt-1">
-            {(error as Error)?.message || '无法加载代码仓库数据'}
-          </p>
-          <div className="flex gap-2 justify-center mt-4">
-            <Button
-              variant="outline"
-              onClick={() => refetch()}
-            >
-              重试
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => window.location.reload()}
-            >
-              刷新页面
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const createMutation = useMutation(repositoryApi.create, {
     onSuccess: () => {
       toast.success('创建成功')
@@ -154,6 +127,33 @@ export default function Repositories() {
       toast.error('连接失败')
     },
   })
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold">加载失败</h3>
+          <p className="text-muted-foreground mt-1">
+            {(error as Error)?.message || '无法加载代码仓库数据'}
+          </p>
+          <div className="flex gap-2 justify-center mt-4">
+            <Button
+              variant="outline"
+              onClick={() => refetch()}
+            >
+              重试
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              刷新页面
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const handleCreate = () => {
     setEditingRepo(null)

@@ -156,7 +156,7 @@ echo ">>> 复制配置文档到前端..."
 
 mkdir -p public
 cp ../CONFIGURATION_GUIDE.md public/
-cp ../test_program/README.md public/TEST_DATA_README.md
+echo "跳过 test_program/README.md（文件不存在）"
 print_success "配置文档已复制"
 
 cd ..

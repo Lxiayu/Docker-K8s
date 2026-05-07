@@ -48,3 +48,14 @@ func Close() error {
 func Get() *gorm.DB {
 	return DB
 }
+
+func Ping() error {
+	if DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Ping()
+}

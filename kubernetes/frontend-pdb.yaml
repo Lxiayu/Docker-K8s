@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cicd-frontend-pdb
+  namespace: cicd-system
+  labels:
+    app.kubernetes.io/name: cicd-frontend
+    app.kubernetes.io/part-of: cicd-platform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cicd-frontend

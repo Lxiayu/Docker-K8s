@@ -1,0 +1,8 @@
+bin/
+vendor/
+.git
+*.log
+tmp/
+.gosec-report.json
+.vscode
+.idea

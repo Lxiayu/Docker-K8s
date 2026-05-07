@@ -31,9 +31,11 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { dashboardApi, TimeRange } from '@/services/dashboard'
+import { useNavigate } from 'react-router-dom'
 
 export default function Dashboard() {
   const [timeRange, setTimeRange] = useState('7days')
+  const navigate = useNavigate()
 
   const timeRangeToApiRange = (range: string): TimeRange => {
     switch (range) {
@@ -274,12 +276,16 @@ export default function Dashboard() {
           ) : (
             <BarChartComponent
               title="资源使用情况"
-              data={[
-                { name: 'CPU', 使用率: stats?.resource_usage?.cpu_avg || 0 },
-                { name: '内存', 使用率: stats?.resource_usage?.memory_avg || 0 },
-              ]}
+              data={
+                stats?.resource_usage && stats.resource_usage.length > 0
+                  ? stats.resource_usage.map((item) => ({ name: item.name, usage: item.usage }))
+                  : [
+                      { name: 'CPU', usage: 0 },
+                      { name: '内存', usage: 0 },
+                    ]
+              }
               bars={[
-                { dataKey: '使用率', fill: '#3b82f6', name: '使用率 (%)' },
+                { dataKey: 'usage', fill: '#3b82f6', name: '使用率 (%)' },
               ]}
               height={300}
             />
@@ -360,7 +366,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground mt-1">
               需要立即关注的告警
             </p>
-            <Button variant="outline" size="sm" className="mt-3">
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate('/monitoring')}>
               查看详情
             </Button>
           </CardContent>
@@ -384,7 +390,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground mt-1">
               正在执行的任务
             </p>
-            <Button variant="outline" size="sm" className="mt-3">
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate('/pipelines')}>
               查看详情
             </Button>
           </CardContent>
@@ -408,7 +414,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground mt-1">
               今日完成的构建
             </p>
-            <Button variant="outline" size="sm" className="mt-3">
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate('/pipelines')}>
               查看详情
             </Button>
           </CardContent>

@@ -1,27 +1,43 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { authApi } from '@/services/auth'
 import { useAuthStore } from '@/store/auth'
 import { User, Lock, ArrowRight } from 'lucide-react'
 
+const loginSchema = z.object({
+  username: z.string().min(1, '请输入用户名'),
+  password: z.string().min(1, '请输入密码'),
+})
+
+type LoginForm = z.infer<typeof loginSchema>
+
 export default function Login() {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const form = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+    },
+  })
+
+  const handleSubmit = async (data: LoginForm) => {
     setLoading(true)
     setError('')
     
     try {
-      const result = await authApi.login({ username, password })
+      const result = await authApi.login({ username: data.username, password: data.password })
       setAuth(result.token, result.user)
       navigate('/')
     } catch (err) {
@@ -47,7 +63,7 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
             <CardContent className="space-y-4">
               {error && (
                 <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
@@ -56,37 +72,45 @@ export default function Login() {
               )}
               
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
+                <Label htmlFor="username">
                   用户名
-                </label>
+                </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="username"
                     type="text"
                     placeholder="请输入用户名"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
                     className="pl-10"
-                    required
+                    {...form.register('username')}
                   />
                 </div>
+                {form.formState.errors.username && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.username.message}
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
+                <Label htmlFor="password">
                   密码
-                </label>
+                </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="password"
                     type="password"
                     placeholder="请输入密码"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
-                    required
+                    {...form.register('password')}
                   />
                 </div>
+                {form.formState.errors.password && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.password.message}
+                  </p>
+                )}
               </div>
               
               <Button 

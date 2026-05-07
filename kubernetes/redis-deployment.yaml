@@ -13,9 +13,24 @@ spec:
       labels:
         app.kubernetes.io/name: redis
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: redis
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
           image: redis:7.0-alpine
+          command: ["redis-server"]
+          args:
+          - "--appendonly"
+          - "yes"
+          - "--appendfsync"
+          - "everysec"
           ports:
             - containerPort: 6379
           resources:
@@ -42,6 +57,11 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /data
-      volumes:
-        - name: redis-data
-          emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi

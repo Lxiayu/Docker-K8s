@@ -30,6 +30,15 @@ on:
           - rollback
           - cleanup
 
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DOCKER_IMAGE_PREFIX: ${{ secrets.DOCKER_USERNAME }}
 
@@ -123,7 +132,7 @@ jobs:
       - name: Backend security scan
         run: |
           cd backend
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.18.2
           gosec -fmt=json -out=gosec-report.json ./...
 
       - name: Frontend security scan
@@ -155,7 +164,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Docker image security scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}'
           format: 'json'
@@ -163,7 +172,7 @@ jobs:
           severity: 'HIGH,CRITICAL'
 
       - name: Docker image security scan (frontend)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}'
           format: 'json'
@@ -179,11 +188,15 @@ jobs:
             frontend/npm-audit-report.json
             trivy-backend-report.json
             trivy-frontend-report.json
+          retention-days: 7
 
   deploy:
     needs: [setup, build]
     runs-on: ubuntu-latest
-    if: github.event.inputs.action == 'deploy' || github.event_name == 'push' || github.event_name == 'pull_request'
+    if: github.event_name == 'push'
+    environment:
+      name: production
+      url: https://cicd.example.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -290,10 +303,10 @@ jobs:
 
       - name: Verify rollback
         run: |
-          echo "=== Rollback Status ==="
-          kubectl get pods -n cicd-${{ github.event.inputs.environment }}
-          kubectl describe service cicd-backend -n cicd-${{ github.event.inputs.environment }} | grep Selector
-          kubectl describe service cicd-frontend -n cicd-${{ github.event.inputs.environment }} | grep Selector
+          kubectl rollout status deployment/cicd-backend -n cicd-system --timeout=60s
+          kubectl rollout status deployment/cicd-frontend -n cicd-system --timeout=60s
+          BACKEND_POD=$(kubectl get pods -n cicd-system -l app=cicd-backend -o jsonpath='{.items[0].metadata.name}')
+          kubectl exec -n cicd-system $BACKEND_POD -- wget -qO- http://localhost:8080/health || exit 1
 
   cleanup:
     needs: setup
@@ -321,7 +334,7 @@ jobs:
           echo "Cleanup completed"
 
   test:
-    needs: build
+    needs: setup
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
@@ -332,6 +345,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+          cache: true
 
       - name: Run backend tests
         working-directory: ./backend
@@ -343,9 +357,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
 
       - name: Run frontend tests
         working-directory: ./frontend
         run: |
           npm ci
-          npm run test || true
+          npm run test

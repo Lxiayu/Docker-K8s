@@ -32,6 +32,21 @@ export function LineChartComponent({
   lines,
   height = 300,
 }: LineChartComponentProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center" style={{ height }}>
+            <p className="text-muted-foreground">暂无数据</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -40,21 +55,22 @@ export function LineChartComponent({
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               dataKey="name" 
-              stroke="#6b7280"
+              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
             />
             <YAxis 
-              stroke="#6b7280"
+              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
             />
             <Tooltip 
               contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
+                backgroundColor: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
                 borderRadius: '8px',
+                color: 'hsl(var(--foreground))',
               }}
             />
             <Legend />

@@ -36,8 +36,12 @@ export interface MetricsResponse {
 
 export interface CreateAlertRuleParams {
   name: string
-  condition: string
+  query: string
+  duration: string
+  severity: string
+  description: string
   enabled?: boolean
+  condition?: string
 }
 
 export const monitoringApi = {
@@ -58,4 +62,7 @@ export const monitoringApi = {
 
   toggleAlertRule: (id: number, enabled: boolean): Promise<void> =>
     request.put(`/monitoring/alerts/rules/${id}`, { enabled }),
+
+  updateAlertRule: (id: number, params: CreateAlertRuleParams): Promise<AlertRule> =>
+    request.put(`/monitoring/alerts/rules/${id}`, params),
 }

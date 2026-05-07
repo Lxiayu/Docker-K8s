@@ -7,6 +7,7 @@ import {
   Rocket,
   Container,
   Activity,
+  FileText,
   Users,
   Settings,
   ChevronLeft,
@@ -17,6 +18,7 @@ import {
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import ThemeToggle from './ThemeToggle'
+import { Breadcrumb } from './Breadcrumb'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +71,11 @@ const menuItems = [
     label: '监控告警',
   },
   {
+    key: '/audit-logs',
+    icon: FileText,
+    label: '审计日志',
+  },
+  {
     key: '/users',
     icon: Users,
     label: '用户管理',
@@ -77,6 +84,11 @@ const menuItems = [
     key: '/settings',
     icon: Settings,
     label: '系统设置',
+  },
+  {
+    key: '/profile',
+    icon: User,
+    label: '个人信息',
   },
 ]
 
@@ -121,14 +133,14 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-slate-900">
+    <div className="flex min-h-screen bg-background">
       <aside
         className={cn(
-          'flex flex-col bg-slate-900 text-white transition-all duration-300 shadow-lg',
+          'flex flex-col bg-[hsl(var(--sidebar-background))] text-[hsl(var(--sidebar-foreground))] transition-all duration-300 shadow-lg',
           collapsed ? 'w-16' : 'w-64'
         )}
       >
-        <div className="flex h-16 items-center justify-center bg-slate-800 text-lg font-bold">
+        <div className="flex h-16 items-center justify-center bg-[hsl(var(--sidebar-accent))] text-lg font-bold">
           {collapsed ? 'CI/CD' : 'CI/CD Platform'}
         </div>
         <nav className="flex-1 py-4">
@@ -140,10 +152,13 @@ export default function Layout() {
                 <li key={item.key}>
                   <button
                     onClick={() => handleMenuClick(item.key)}
+                    title={collapsed ? item.label : undefined}
                     className={cn(
-                      'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800',
-                      isActive ? 'bg-slate-700 text-white' : 'text-slate-300',
-                      collapsed && 'justify-center px-2'
+                      'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors',
+                      collapsed && 'justify-center px-2',
+                      isActive
+                        ? 'border-l-2 border-primary bg-accent/50 text-primary'
+                        : 'border-l-2 border-transparent hover:bg-accent/30 hover:text-accent-foreground'
                     )}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
@@ -157,10 +172,10 @@ export default function Layout() {
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between bg-white px-6 shadow dark:bg-slate-800">
+        <header className="flex h-16 items-center justify-between bg-card px-6 shadow">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex h-10 w-10 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-blue-400"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
@@ -168,13 +183,13 @@ export default function Layout() {
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700">
+                <div className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-accent">
                   <Avatar>
                     <AvatarFallback>
                       <User className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{user?.username}</span>
+                  <span className="text-sm font-medium">{user?.username}</span>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -196,9 +211,12 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="m-6 flex-1 rounded-lg bg-white p-6 shadow-sm dark:bg-slate-800">
-          <Outlet />
-        </main>
+        <div className="flex-1 overflow-auto bg-background">
+          <div className="p-6">
+            <Breadcrumb />
+            <Outlet />
+          </div>
+        </div>
       </div>
 
       <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -24,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Pagination } from '@/components/ui/pagination'
 import { pipelineApi, Pipeline } from '@/services/pipeline'
 import {
   Plus,
@@ -31,10 +33,10 @@ import {
   Trash2,
   Play,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
+  Search,
   AlertTriangle,
 } from 'lucide-react'
+import { PageHeader } from '@/components/PageHeader'
 
 const pipelineSchema = z.object({
   name: z.string().min(1, '请输入名称'),
@@ -43,9 +45,18 @@ const pipelineSchema = z.object({
 
 type PipelineFormData = z.infer<typeof pipelineSchema>
 
+const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destructive'; className?: string }> = {
+  success: { variant: 'default', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+  failed: { variant: 'destructive' },
+  running: { variant: 'default', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
+  pending: { variant: 'secondary' },
+}
+
 export default function Pipelines() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null)
@@ -56,6 +67,19 @@ export default function Pipelines() {
     ['pipelines', page, pageSize],
     () => pipelineApi.list({ page, page_size: pageSize })
   )
+
+  const handleSearch = () => {
+    setSearch(searchInput)
+    setPage(1)
+  }
+
+  const filteredList = useMemo(() => {
+    if (!data?.list) return []
+    if (!search) return data.list
+    return data.list.filter((p) =>
+      p.name.toLowerCase().includes(search.toLowerCase())
+    )
+  }, [data?.list, search])
 
   const form = useForm<PipelineFormData>({
     resolver: zodResolver(pipelineSchema),
@@ -169,11 +193,28 @@ export default function Pipelines() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">流水线管理</h1>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          新建流水线
+      <PageHeader
+        title="流水线管理"
+        actions={
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            新建流水线
+          </Button>
+        }
+      />
+
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Input
+            placeholder="搜索流水线名称..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+        </div>
+        <Button variant="secondary" onClick={handleSearch}>
+          <Search className="h-4 w-4 mr-1" />
+          搜索
         </Button>
       </div>
 
@@ -195,12 +236,19 @@ export default function Pipelines() {
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ) : data?.list && data.list.length > 0 ? (
-              data.list.map((pipeline) => (
+            ) : filteredList.length > 0 ? (
+              filteredList.map((pipeline) => (
                 <TableRow key={pipeline.id}>
                   <TableCell>{pipeline.id}</TableCell>
                   <TableCell className="font-medium">{pipeline.name}</TableCell>
-                  <TableCell>{pipeline.status}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={statusConfig[pipeline.status]?.variant || 'secondary'}
+                      className={statusConfig[pipeline.status]?.className}
+                    >
+                      {pipeline.status}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{pipeline.last_build_at || '-'}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -246,44 +294,14 @@ export default function Pipelines() {
       </div>
 
       {data?.total ? (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>每页</span>
-            <select
-              className="h-8 w-16 rounded-md border border-input bg-background px-2 text-sm"
-              value={pageSize}
-              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            >
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-            </select>
-            <span>条</span>
-            <span className="ml-4">共 {data.total} 条</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">
-              第 {page} / {totalPages} 页
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={data.total}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

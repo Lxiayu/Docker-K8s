@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cicd-application-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  cicd-application.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "title": "API 请求量",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[5m])) by (method)",
+              "legendFormat": "{{method}}"
+            }
+          ]
+        },
+        {
+          "title": "API 响应时间 P95",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method))",
+              "legendFormat": "{{method}}"
+            }
+          ]
+        },
+        {
+          "title": "API 错误率",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+              "legendFormat": "Error Rate"
+            }
+          ]
+        },
+        {
+          "title": "构建成功率",
+          "type": "gauge",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(pipeline_build_total{status=\"success\"}[1h])) / sum(rate(pipeline_build_total[1h])) * 100",
+              "legendFormat": "Success Rate"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "green", "value": 90 }
+                ]
+              },
+              "min": 0,
+              "max": 100
+            }
+          }
+        },
+        {
+          "title": "部署次数",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(increase(deployment_total[24h]))",
+              "legendFormat": "Deployments"
+            }
+          ]
+        },
+        {
+          "title": "活跃用户数",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+          "targets": [
+            {
+              "expr": "count(count by (user_id) (increase(http_requests_total[1h])))",
+              "legendFormat": "Active Users"
+            }
+          ]
+        },
+        {
+          "title": "构建趋势",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "targets": [
+            {
+              "expr": "sum(rate(pipeline_build_total{status=\"success\"}[1h])) by (pipeline_name)",
+              "legendFormat": "success: {{pipeline_name}}"
+            },
+            {
+              "expr": "sum(rate(pipeline_build_total{status=\"failed\"}[1h])) by (pipeline_name)",
+              "legendFormat": "failed: {{pipeline_name}}"
+            }
+          ]
+        },
+        {
+          "title": "数据库连接池",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "targets": [
+            {
+              "expr": "go_sql_open_connections",
+              "legendFormat": "Open Connections"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["cicd", "application"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "CI/CD Platform - Application",
+      "uid": "cicd-app-dashboard"
+    }

@@ -1,23 +1,47 @@
 package router
 
 import (
+	"net/http"
+	"time"
+
 	"backend/internal/handlers"
 	"backend/internal/middleware"
+	"backend/pkg/database"
+	"backend/pkg/redis"
 	"github.com/gin-gonic/gin"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
 )
 
+var startTime = time.Now()
+
 func Setup(engine *gin.Engine) {
 	engine.GET("/health", func(c *gin.Context) {
+		uptime := time.Since(startTime)
 		c.JSON(200, gin.H{
-			"status": "ok",
+			"status":  "ok",
+			"uptime":  uptime.String(),
+			"started": startTime.Format(time.RFC3339),
 		})
 	})
 
 	engine.GET("/ready", func(c *gin.Context) {
+		dbErr := database.Ping()
+		redisErr := redis.Ping()
+
+		if dbErr != nil || redisErr != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "not ready",
+				"database": dbErr == nil,
+				"redis":    redisErr == nil,
+			})
+			return
+		}
+
 		c.JSON(200, gin.H{
-			"status": "ready",
+			"status":   "ready",
+			"database": true,
+			"redis":    true,
 		})
 	})
 
@@ -28,7 +52,7 @@ func Setup(engine *gin.Engine) {
 	{
 		auth := api.Group("/auth")
 		{
-			auth.POST("/login", handlers.Login)
+			auth.POST("/login", middleware.RateLimit(5, 10), handlers.Login)
 			auth.POST("/register", handlers.Register)
 		}
 

@@ -68,8 +68,8 @@ check_database() {
     else
         echo -e "  ${YELLOW}!${NC} PostgreSQL 容器未运行，正在启动..."
         docker run -d --name cicd-postgres \
-            -e POSTGRES_USER=cicd \
-            -e POSTGRES_PASSWORD=cicd123 \
+            -e POSTGRES_USER=${POSTGRES_USER:-cicd} \
+            -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme} \
             -e POSTGRES_DB=cicd_platform \
             -p 5432:5432 \
             postgres:15-alpine 2>/dev/null || {

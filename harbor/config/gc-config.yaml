@@ -79,13 +79,71 @@ spec:
             - /bin/sh
             - -c
             - |
-              echo "Starting Harbor Garbage Collection..."
+              execute_gc() {
+                  local harbor_url="${HARBOR_URL:-https://harbor.local}"
+                  local harbor_user="${HARBOR_ADMIN_USER:-admin}"
+                  local harbor_pass="${HARBOR_ADMIN_PASSWORD}"
               
-              echo "Deleting untagged artifacts..."
+                  if [ -z "$harbor_pass" ]; then
+                      echo "ERROR: HARBOR_ADMIN_PASSWORD not set"
+                      return 1
+                  fi
               
-              echo "Running garbage collection..."
+                  echo "Starting Harbor Garbage Collection..."
               
-              echo "Garbage collection completed successfully"
+                  # Get CSRF token
+                  local csrf_token=$(curl -sk -u "${harbor_user}:${harbor_pass}" \
+                      "${harbor_url}/api/v2.0/system/gc/schedule" \
+                      -H "X-IsForResourceList: true" | head -1)
+              
+                  # Create GC job
+                  local response=$(curl -sk -X POST \
+                      -u "${harbor_user}:${harbor_pass}" \
+                      "${harbor_url}/api/v2.0/system/gc/schedule" \
+                      -H "Content-Type: application/json" \
+                      -d '{
+                          "parameters": {
+                              "delete_untagged": true,
+                              "dry_run": false
+                          },
+                          "schedule": {
+                              "type": "Manual"
+                          }
+                      }')
+              
+                  echo "GC job submitted: $response"
+              
+                  # Extract job ID and wait for completion
+                  local job_id=$(echo "$response" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+              
+                  if [ -n "$job_id" ]; then
+                      echo "Waiting for GC job $job_id to complete..."
+                      local status=""
+                      for i in $(seq 1 60); do
+                          status=$(curl -sk -u "${harbor_user}:${harbor_pass}" \
+                              "${harbor_url}/api/v2.0/system/gc/${job_id}" | \
+                              grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+                          echo "  Status: $status (attempt $i/60)"
+                          if [ "$status" = "finished" ] || [ "$status" = "stopped" ] || [ "$status" = "error" ]; then
+                              break
+                          fi
+                          sleep 10
+                      done
+              
+                      if [ "$status" = "finished" ]; then
+                          echo "Garbage collection completed successfully"
+                          return 0
+                      else
+                          echo "Garbage collection ended with status: $status"
+                          return 1
+                      fi
+                  else
+                      echo "WARNING: Could not extract job ID, GC may have started"
+                      return 0
+                  fi
+              }
+              
+              execute_gc
             env:
             - name: HARBOR_ADMIN_PASSWORD
               valueFrom:

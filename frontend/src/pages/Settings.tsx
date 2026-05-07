@@ -236,7 +236,7 @@ export default function Settings() {
   const handleTestRegistry = async () => {
     setTestingRegistry(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await settingsApi.testRegistry()
       toast.success('镜像仓库连接成功')
     } catch {
       toast.error('镜像仓库连接失败')
@@ -248,7 +248,7 @@ export default function Settings() {
   const handleTestNotification = async (type: 'email' | 'dingtalk' | 'wechat') => {
     setTestingNotification(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await settingsApi.testNotification(type)
       const typeNames = { email: '邮件', dingtalk: '钉钉', wechat: '企业微信' }
       toast.success(`${typeNames[type]}通知测试成功`)
     } catch {

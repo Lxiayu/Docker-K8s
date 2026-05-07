@@ -30,6 +30,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { imageApi, Image, ImageDetail, BuildImageParams } from '@/services/image'
+import { repositoryApi } from '@/services/repository'
+import { Pagination } from '@/components/ui/pagination'
+import { PageHeader } from '@/components/PageHeader'
 import {
   Plus,
   Search,
@@ -38,16 +41,12 @@ import {
   CheckCircle,
   Clock,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   Image as ImageIcon,
   Trash2,
   Scan,
   Eye,
   XCircle,
 } from 'lucide-react'
-
-const projects = ['library', 'frontend', 'backend', 'microservices', 'tools']
 
 const scanStatusConfig: Record<string, { 
   label: string
@@ -139,6 +138,14 @@ export default function Images() {
       search: search || undefined 
     })
   )
+
+  const { data: reposData } = useQuery(
+    ['repositories-all'],
+    () => repositoryApi.list({ page: 1, page_size: 100 }),
+    { staleTime: 5 * 60 * 1000 }
+  )
+
+  const projects = [...new Set((reposData?.list || []).map((r) => r.name))]
 
   const detailQuery = useQuery(
     ['image-detail', selectedImage?.id],
@@ -252,16 +259,16 @@ export default function Images() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">镜像管理</h1>
-          <p className="text-muted-foreground">管理 Docker 镜像与 Harbor 集成</p>
-        </div>
-        <Button onClick={() => setBuildDialogVisible(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          构建镜像
-        </Button>
-      </div>
+      <PageHeader
+        title="镜像管理"
+        description="管理 Docker 镜像与 Harbor 集成"
+        actions={
+          <Button onClick={() => setBuildDialogVisible(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            构建镜像
+          </Button>
+        }
+      />
 
       <div className="flex gap-4 items-center">
         <div className="flex gap-2 flex-1">
@@ -392,32 +399,13 @@ export default function Images() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            共 {data?.total || 0} 条记录
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">
-              第 {page} / {totalPages} 页
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={data?.total || 0}
+          pageSize={pageSize}
+          onPageChange={setPage}
+        />
       )}
 
       <Dialog open={detailVisible} onOpenChange={setDetailVisible}>
@@ -599,9 +587,11 @@ export default function Images() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">不使用仓库</SelectItem>
-                  <SelectItem value="1">frontend-app</SelectItem>
-                  <SelectItem value="2">backend-api</SelectItem>
-                  <SelectItem value="3">microservice-auth</SelectItem>
+                  {(reposData?.list || []).map((repo) => (
+                    <SelectItem key={repo.id} value={String(repo.id)}>
+                      {repo.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -96,3 +96,12 @@ func GetWithTTL(key string) (string, time.Duration, error) {
 
 	return val, ttl, nil
 }
+
+// Ping 检查Redis连接是否正常
+func Ping() error {
+	if Client == nil {
+		return fmt.Errorf("redis not initialized")
+	}
+	ctx := context.Background()
+	return Client.Ping(ctx).Err()
+}

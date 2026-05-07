@@ -12,6 +12,7 @@ import Deployments from './pages/Deployments'
 import DeploymentDetail from './pages/DeploymentDetail'
 import Images from './pages/Images'
 import Monitoring from './pages/Monitoring'
+import AuditLogs from './pages/AuditLogs'
 import Users from './pages/Users'
 import Settings from './pages/Settings'
 import Profile from './pages/Profile'
@@ -58,6 +59,7 @@ function App() {
               <Route path="deployments/:id" element={<DeploymentDetail />} />
               <Route path="images" element={<Images />} />
               <Route path="monitoring" element={<Monitoring />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="users" element={<Users />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />

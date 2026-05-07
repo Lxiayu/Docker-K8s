@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { toast } from 'sonner'
 import {
   Table,
@@ -30,6 +33,8 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { deploymentApi, Deployment } from '@/services/deployment'
+import { PageHeader } from '@/components/PageHeader'
+import { Pagination } from '@/components/ui/pagination'
 import {
   Plus,
   Pencil,
@@ -38,8 +43,6 @@ import {
   RotateCcw,
   FileText,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react'
 
 interface ConfirmDialogProps {
@@ -80,14 +83,16 @@ function ConfirmDialog({
   )
 }
 
-interface FormData {
-  name: string
-  namespace: string
-  image: string
-  replicas: number
-  strategy: 'rolling' | 'canary' | 'blue-green'
-  environment: 'dev' | 'test' | 'prod' | ''
-}
+const deploymentSchema = z.object({
+  name: z.string().min(1, '请输入名称'),
+  namespace: z.string().min(1, '请输入命名空间'),
+  image: z.string().min(1, '请输入镜像地址'),
+  replicas: z.number().min(1, '副本数至少为1'),
+  strategy: z.enum(['rolling', 'canary', 'blue-green']),
+  environment: z.enum(['dev', 'test', 'prod']),
+})
+
+type DeploymentFormData = z.infer<typeof deploymentSchema>
 
 const strategyText: Record<string, string> = {
   rolling: '滚动更新',
@@ -108,6 +113,15 @@ const statusVariants: Record<string, 'default' | 'secondary' | 'destructive' | '
   updating: 'warning',
 }
 
+const statusText: Record<string, string> = {
+  running: '运行中',
+  success: '成功',
+  succeeded: '成功',
+  failed: '失败',
+  pending: '等待中',
+  stopped: '已停止',
+}
+
 export default function Deployments() {
   const [page, setPage] = useState(1)
   const pageSize = 10
@@ -116,15 +130,18 @@ export default function Deployments() {
   const [detailVisible, setDetailVisible] = useState(false)
   const [editingDeployment, setEditingDeployment] = useState<Deployment | null>(null)
   const [selectedDeployment, setSelectedDeployment] = useState<Deployment | null>(null)
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    namespace: '',
-    image: '',
-    replicas: 1,
-    strategy: 'rolling',
-    environment: '',
+
+  const form = useForm<DeploymentFormData>({
+    resolver: zodResolver(deploymentSchema),
+    defaultValues: {
+      name: '',
+      namespace: '',
+      image: '',
+      replicas: 1,
+      strategy: 'rolling',
+      environment: 'dev',
+    },
   })
-  const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormData, string>>>({})
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
@@ -190,16 +207,31 @@ export default function Deployments() {
     },
   })
 
+  const updateMutation = useMutation(
+    (params: { id: number; data: Partial<Deployment> }) =>
+      deploymentApi.update(params.id, params.data),
+    {
+      onSuccess: () => {
+        toast.success('更新成功')
+        queryClient.invalidateQueries('deployments')
+        setModalVisible(false)
+        resetForm()
+      },
+      onError: () => {
+        toast.error('更新失败')
+      },
+    }
+  )
+
   const resetForm = () => {
-    setFormData({
+    form.reset({
       name: '',
       namespace: '',
       image: '',
       replicas: 1,
       strategy: 'rolling',
-      environment: '',
+      environment: 'dev',
     })
-    setFormErrors({})
     setEditingDeployment(null)
   }
 
@@ -210,7 +242,7 @@ export default function Deployments() {
 
   const handleEdit = (record: Deployment) => {
     setEditingDeployment(record)
-    setFormData({
+    form.reset({
       name: record.name,
       namespace: record.namespace,
       image: record.image,
@@ -262,39 +294,14 @@ export default function Deployments() {
     setDetailVisible(true)
   }
 
-  const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof FormData, string>> = {}
-
-    if (!formData.name.trim()) {
-      errors.name = '请输入名称'
-    }
-    if (!formData.namespace.trim()) {
-      errors.namespace = '请输入命名空间'
-    }
-    if (!formData.image.trim()) {
-      errors.image = '请输入镜像地址'
-    }
-    if (!formData.environment) {
-      errors.environment = '请选择环境'
-    }
-
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      return
-    }
-
+  const onFormSubmit = (data: DeploymentFormData) => {
     if (editingDeployment) {
-      toast.info('更新功能暂未实现')
+      updateMutation.mutate({
+        id: editingDeployment.id,
+        data,
+      })
     } else {
-      const submitData = {
-        ...formData,
-        environment: formData.environment as 'dev' | 'test' | 'prod',
-      }
-      createMutation.mutate(submitData)
+      createMutation.mutate(data)
     }
   }
 
@@ -302,23 +309,28 @@ export default function Deployments() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          创建部署
-        </Button>
-        <Select value={environment} onValueChange={setEnvironment}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="选择环境" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">全部环境</SelectItem>
-            <SelectItem value="dev">开发环境</SelectItem>
-            <SelectItem value="test">测试环境</SelectItem>
-            <SelectItem value="prod">生产环境</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <PageHeader
+        title="部署管理"
+        actions={
+          <>
+            <Button onClick={handleCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              创建部署
+            </Button>
+            <Select value={environment} onValueChange={setEnvironment}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="选择环境" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部环境</SelectItem>
+                <SelectItem value="dev">开发环境</SelectItem>
+                <SelectItem value="test">测试环境</SelectItem>
+                <SelectItem value="prod">生产环境</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
       <div className="rounded-md border">
         <Table>
@@ -366,7 +378,7 @@ export default function Deployments() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariants[record.status] || 'default'}>
-                      {record.status}
+                      {statusText[record.status] || record.status}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -423,32 +435,13 @@ export default function Deployments() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            共 {data?.total || 0} 条记录
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">
-              第 {page} / {totalPages} 页
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={data?.total || 0}
+          pageSize={pageSize}
+          onPageChange={setPage}
+        />
       )}
 
       <Dialog open={modalVisible} onOpenChange={setModalVisible}>
@@ -456,17 +449,16 @@ export default function Deployments() {
           <DialogHeader>
             <DialogTitle>{editingDeployment ? '编辑部署' : '创建部署'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <form onSubmit={form.handleSubmit(onFormSubmit)} className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">名称</Label>
               <Input
                 id="name"
                 placeholder="应用名称"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                {...form.register('name')}
               />
-              {formErrors.name && (
-                <p className="text-sm text-destructive">{formErrors.name}</p>
+              {form.formState.errors.name && (
+                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
               )}
             </div>
             <div className="grid gap-2">
@@ -474,11 +466,10 @@ export default function Deployments() {
               <Input
                 id="namespace"
                 placeholder="例如：prod"
-                value={formData.namespace}
-                onChange={(e) => setFormData({ ...formData, namespace: e.target.value })}
+                {...form.register('namespace')}
               />
-              {formErrors.namespace && (
-                <p className="text-sm text-destructive">{formErrors.namespace}</p>
+              {form.formState.errors.namespace && (
+                <p className="text-sm text-destructive">{form.formState.errors.namespace.message}</p>
               )}
             </div>
             <div className="grid gap-2">
@@ -486,11 +477,10 @@ export default function Deployments() {
               <Input
                 id="image"
                 placeholder="例如：harbor.local/app:v1.0.0"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                {...form.register('image')}
               />
-              {formErrors.image && (
-                <p className="text-sm text-destructive">{formErrors.image}</p>
+              {form.formState.errors.image && (
+                <p className="text-sm text-destructive">{form.formState.errors.image.message}</p>
               )}
             </div>
             <div className="grid gap-2">
@@ -499,15 +489,17 @@ export default function Deployments() {
                 id="replicas"
                 type="number"
                 min={1}
-                value={formData.replicas}
-                onChange={(e) => setFormData({ ...formData, replicas: parseInt(e.target.value) || 1 })}
+                {...form.register('replicas', { valueAsNumber: true })}
               />
+              {form.formState.errors.replicas && (
+                <p className="text-sm text-destructive">{form.formState.errors.replicas.message}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="strategy">部署策略</Label>
               <Select
-                value={formData.strategy}
-                onValueChange={(value) => setFormData({ ...formData, strategy: value as 'rolling' | 'canary' | 'blue-green' })}
+                value={form.watch('strategy')}
+                onValueChange={(value) => form.setValue('strategy', value as 'rolling' | 'canary' | 'blue-green')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择部署策略" />
@@ -522,8 +514,8 @@ export default function Deployments() {
             <div className="grid gap-2">
               <Label htmlFor="environment">环境</Label>
               <Select
-                value={formData.environment}
-                onValueChange={(value) => setFormData({ ...formData, environment: value as 'dev' | 'test' | 'prod' })}
+                value={form.watch('environment')}
+                onValueChange={(value) => form.setValue('environment', value as 'dev' | 'test' | 'prod')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择环境" />
@@ -534,28 +526,29 @@ export default function Deployments() {
                   <SelectItem value="prod">生产环境</SelectItem>
                 </SelectContent>
               </Select>
-              {formErrors.environment && (
-                <p className="text-sm text-destructive">{formErrors.environment}</p>
+              {form.formState.errors.environment && (
+                <p className="text-sm text-destructive">{form.formState.errors.environment.message}</p>
               )}
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setModalVisible(false)
-                resetForm()
-              }}
-            >
-              取消
-            </Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isLoading}>
-              {createMutation.isLoading && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {editingDeployment ? '更新' : '创建'}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setModalVisible(false)
+                  resetForm()
+                }}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={createMutation.isLoading || updateMutation.isLoading}>
+                {(createMutation.isLoading || updateMutation.isLoading) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editingDeployment ? '更新' : '创建'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

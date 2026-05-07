@@ -14,6 +14,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -21,6 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   AlertTriangle,
   CheckCircle,
@@ -31,8 +41,11 @@ import {
   Ban,
   Loader2,
   Search,
+  Plus,
 } from 'lucide-react'
-import { monitoringApi, Alert, AlertRule, Metric } from '@/services/monitoring'
+import { monitoringApi, Alert, AlertRule, Metric, CreateAlertRuleParams } from '@/services/monitoring'
+import { PageHeader } from '@/components/PageHeader'
+import { Pagination } from '@/components/ui/pagination'
 
 function StatCard({
   title,
@@ -58,17 +71,27 @@ function StatCard({
   )
 }
 
-function MetricCard({ name, value }: { name: string; value: string }) {
+function MetricCard({ name, value, color }: { name: string; value: string; color?: string }) {
+  const colorClass = color || 'text-blue-500'
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-blue-500">{value}</div>
+        <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
       </CardContent>
     </Card>
   )
+}
+
+function getMetricColor(name: string): string {
+  const lower = name.toLowerCase()
+  if (lower.includes('error') || lower.includes('错误') || lower.includes('失败')) return 'text-red-500'
+  if (lower.includes('success') || lower.includes('成功')) return 'text-green-500'
+  if (lower.includes('response') || lower.includes('延迟') || lower.includes('响应')) return 'text-yellow-500'
+  if (lower.includes('pipeline') || lower.includes('流水线') || lower.includes('活跃')) return 'text-blue-500'
+  return 'text-blue-500'
 }
 
 function InfoAlert({
@@ -104,10 +127,12 @@ function InfoAlert({
 function AlertRuleItem({
   rule,
   onToggle,
+  onEdit,
   isLoading,
 }: {
   rule: AlertRule
   onToggle: (id: number, enabled: boolean) => void
+  onEdit: (rule: AlertRule) => void
   isLoading: boolean
 }) {
   return (
@@ -120,7 +145,7 @@ function AlertRuleItem({
         <Badge variant={rule.enabled ? 'success' : 'secondary'}>
           {rule.enabled ? '已启用' : '已禁用'}
         </Badge>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" onClick={() => onEdit(rule)}>
           <Pencil className="h-4 w-4" />
         </Button>
         <Button
@@ -139,7 +164,20 @@ function AlertRuleItem({
 export default function Monitoring() {
   const [severityFilter, setSeverityFilter] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [alertPage, setAlertPage] = useState(1)
+  const alertPageSize = 10
   const queryClient = useQueryClient()
+
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false)
+  const [editingRule, setEditingRule] = useState<AlertRule | null>(null)
+  const [ruleForm, setRuleForm] = useState<CreateAlertRuleParams>({
+    name: '',
+    query: '',
+    duration: '5m',
+    severity: 'warning',
+    description: '',
+    enabled: true,
+  })
 
   const { data: metricsData, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery(
     ['monitoring', 'metrics'],
@@ -187,6 +225,77 @@ export default function Monitoring() {
     }
   )
 
+  const createRuleMutation = useMutation(monitoringApi.createAlertRule, {
+    onSuccess: () => {
+      toast.success('告警规则已创建')
+      queryClient.invalidateQueries(['monitoring', 'alertRules'])
+      setRuleDialogOpen(false)
+      resetRuleForm()
+    },
+    onError: () => {
+      toast.error('创建失败')
+    },
+  })
+
+  const updateRuleMutation = useMutation(
+    ({ id, data }: { id: number; data: CreateAlertRuleParams }) =>
+      monitoringApi.updateAlertRule(id, data),
+    {
+      onSuccess: () => {
+        toast.success('告警规则已更新')
+        queryClient.invalidateQueries(['monitoring', 'alertRules'])
+        setRuleDialogOpen(false)
+        resetRuleForm()
+      },
+      onError: () => {
+        toast.error('更新失败')
+      },
+    }
+  )
+
+  const resetRuleForm = () => {
+    setRuleForm({
+      name: '',
+      query: '',
+      duration: '5m',
+      severity: 'warning',
+      description: '',
+      enabled: true,
+    })
+    setEditingRule(null)
+  }
+
+  const handleCreateRule = () => {
+    resetRuleForm()
+    setEditingRule(null)
+    setRuleDialogOpen(true)
+  }
+
+  const handleEditRule = (rule: AlertRule) => {
+    setEditingRule(rule)
+    setRuleForm({
+      name: rule.name,
+      query: rule.condition || '',
+      duration: '5m',
+      severity: 'warning',
+      description: '',
+      enabled: rule.enabled,
+    })
+    setRuleDialogOpen(true)
+  }
+
+  const handleSaveRule = () => {
+    if (!ruleForm.name.trim()) {
+      toast.error('请输入规则名称')
+      return
+    }
+    if (editingRule) {
+      updateRuleMutation.mutate({ id: editingRule.id, data: ruleForm })
+    } else {
+      createRuleMutation.mutate(ruleForm)
+    }
+  }
+
   const handleRefresh = () => {
     refetchMetrics()
     refetchAlerts()
@@ -214,8 +323,25 @@ export default function Monitoring() {
     return true
   })
 
+  const alertTotalPages = Math.ceil(filteredAlerts.length / alertPageSize)
+  const paginatedAlerts = filteredAlerts.slice(
+    (alertPage - 1) * alertPageSize,
+    alertPage * alertPageSize
+  )
+
   return (
     <div className="space-y-4">
+      <PageHeader
+        title="监控告警"
+        description="系统监控与告警管理"
+        actions={
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            刷新
+          </Button>
+        }
+      />
+
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           title="总告警数"
@@ -255,11 +381,7 @@ export default function Monitoring() {
 
             <TabsContent value="alerts" className="space-y-4">
               <div className="flex items-center gap-4">
-                <Button variant="outline" onClick={handleRefresh}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  刷新
-                </Button>
-                <Select value={severityFilter} onValueChange={setSeverityFilter}>
+                <Select value={severityFilter} onValueChange={(value) => { setSeverityFilter(value); setAlertPage(1); }}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="全部级别" />
                   </SelectTrigger>
@@ -275,7 +397,7 @@ export default function Monitoring() {
                   <Input
                     placeholder="搜索告警..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => { setSearchQuery(e.target.value); setAlertPage(1); }}
                     className="pl-8"
                   />
                 </div>
@@ -298,14 +420,14 @@ export default function Monitoring() {
                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                       </TableCell>
                     </TableRow>
-                  ) : filteredAlerts.length === 0 ? (
+                  ) : paginatedAlerts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         暂无告警
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAlerts.map((alert) => (
+                    paginatedAlerts.map((alert) => (
                       <TableRow key={alert.id}>
                         <TableCell className="font-medium">{alert.name}</TableCell>
                         <TableCell>{getSeverityBadge(alert.severity)}</TableCell>
@@ -331,6 +453,15 @@ export default function Monitoring() {
                   )}
                 </TableBody>
               </Table>
+              {alertTotalPages > 1 && (
+                <Pagination
+                  page={alertPage}
+                  totalPages={alertTotalPages}
+                  total={filteredAlerts.length}
+                  pageSize={alertPageSize}
+                  onPageChange={setAlertPage}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="metrics">
@@ -341,7 +472,12 @@ export default function Monitoring() {
               ) : (
                 <div className="grid gap-4 md:grid-cols-4">
                   {(metricsData?.metrics || []).map((metric: Metric, index: number) => (
-                    <MetricCard key={index} name={metric.name} value={metric.value} />
+                    <MetricCard
+                      key={index}
+                      name={metric.name}
+                      value={metric.value}
+                      color={getMetricColor(metric.name)}
+                    />
                   ))}
                 </div>
               )}
@@ -358,8 +494,12 @@ export default function Monitoring() {
 
             <TabsContent value="rules">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>告警规则配置</CardTitle>
+                  <Button size="sm" onClick={handleCreateRule}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    新建规则
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {rulesLoading ? (
@@ -376,6 +516,7 @@ export default function Monitoring() {
                         key={rule.id}
                         rule={rule}
                         onToggle={(id, enabled) => toggleRuleMutation.mutate({ id, enabled })}
+                        onEdit={handleEditRule}
                         isLoading={toggleRuleMutation.isLoading}
                       />
                     ))
@@ -386,6 +527,94 @@ export default function Monitoring() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={ruleDialogOpen} onOpenChange={setRuleDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editingRule ? '编辑告警规则' : '新建告警规则'}</DialogTitle>
+            <DialogDescription>
+              配置告警规则的详细参数
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="rule-name">规则名称</Label>
+              <Input
+                id="rule-name"
+                placeholder="例如: CPU使用率过高"
+                value={ruleForm.name}
+                onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="rule-query">PromQL 表达式</Label>
+              <Input
+                id="rule-query"
+                placeholder="例如: cpu_usage > 80"
+                value={ruleForm.query}
+                onChange={(e) => setRuleForm({ ...ruleForm, query: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="rule-duration">持续时间</Label>
+                <Input
+                  id="rule-duration"
+                  placeholder="5m"
+                  value={ruleForm.duration}
+                  onChange={(e) => setRuleForm({ ...ruleForm, duration: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="rule-severity">严重程度</Label>
+                <Select
+                  value={ruleForm.severity}
+                  onValueChange={(value) => setRuleForm({ ...ruleForm, severity: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择严重程度" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="warning">警告</SelectItem>
+                    <SelectItem value="critical">严重</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="rule-description">描述</Label>
+              <Input
+                id="rule-description"
+                placeholder="规则描述"
+                value={ruleForm.description}
+                onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="rule-enabled"
+                checked={ruleForm.enabled}
+                onCheckedChange={(checked) => setRuleForm({ ...ruleForm, enabled: checked })}
+              />
+              <Label htmlFor="rule-enabled">启用规则</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRuleDialogOpen(false); resetRuleForm(); }}>
+              取消
+            </Button>
+            <Button
+              onClick={handleSaveRule}
+              disabled={createRuleMutation.isLoading || updateRuleMutation.isLoading}
+            >
+              {(createRuleMutation.isLoading || updateRuleMutation.isLoading) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {editingRule ? '更新' : '创建'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -14,8 +14,17 @@ spec:
       labels:
         app: cicd-backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
-      - name: backend
+      - name: cicd-backend
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop: ["ALL"]
         image: docker.io/USERNAME/cicd-backend:latest
         ports:
         - containerPort: 8080

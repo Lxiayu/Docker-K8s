@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Pagination } from '@/components/ui/pagination'
 import { userApi, User } from '@/services/auth'
 import { 
   Plus, 
@@ -48,9 +49,9 @@ import {
   Trash2, 
   User as UserIcon, 
   Loader2,
-  ChevronLeft,
-  ChevronRight
+  Search
 } from 'lucide-react'
+import { PageHeader } from '@/components/PageHeader'
 
 const userSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
@@ -84,6 +85,8 @@ const getRoleLabel = (role: string): string => {
 export default function Users() {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(10)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -94,6 +97,22 @@ export default function Users() {
     ['users', page, pageSize],
     () => userApi.list({ page, page_size: pageSize })
   )
+
+  const handleSearch = () => {
+    setSearch(searchInput)
+    setPage(1)
+  }
+
+  const filteredList = useMemo(() => {
+    if (!data?.list) return []
+    if (!search) return data.list
+    const q = search.toLowerCase()
+    return data.list.filter(
+      (u) =>
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q)
+    )
+  }, [data?.list, search])
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
@@ -211,14 +230,29 @@ export default function Users() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">用户管理</h1>
-          <p className="text-muted-foreground">管理系统用户和权限</p>
+      <PageHeader
+        title="用户管理"
+        description="管理系统用户和权限"
+        actions={
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            创建用户
+          </Button>
+        }
+      />
+
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Input
+            placeholder="搜索用户名或邮箱..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          创建用户
+        <Button variant="secondary" onClick={handleSearch}>
+          <Search className="h-4 w-4 mr-1" />
+          搜索
         </Button>
       </div>
 
@@ -242,14 +276,14 @@ export default function Users() {
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ) : (data?.list || []).length === 0 ? (
+            ) : filteredList.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   暂无数据
                 </TableCell>
               </TableRow>
             ) : (
-              (data?.list || []).map((user) => (
+              filteredList.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>{user.id}</TableCell>
                   <TableCell>
@@ -299,32 +333,13 @@ export default function Users() {
       </div>
 
       {data && data.total > 0 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            共 {data.total} 条记录
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-sm">
-              第 {page} / {totalPages} 页
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={data.total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+        />
       )}
 
       <Dialog open={modalVisible} onOpenChange={setModalVisible}>

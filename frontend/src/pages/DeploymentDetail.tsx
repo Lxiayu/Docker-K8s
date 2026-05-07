@@ -46,8 +46,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
-  Clock,
-  XCircle,
+  Globe,
+  Activity,
 } from 'lucide-react'
 
 const environmentColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
@@ -270,7 +270,7 @@ export default function DeploymentDetail() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">环境</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <Badge variant={environmentColors[deployment.environment] || 'default'}>
@@ -281,7 +281,7 @@ export default function DeploymentDetail() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">状态</CardTitle>
-            <XCircle className="h-4 w-4 text-muted-foreground" />
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <Badge variant={statusVariants[deployment.status] || 'default'}>

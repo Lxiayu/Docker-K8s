@@ -17,6 +17,13 @@ export interface User {
   email: string
   role: string
   status: number
+  real_name?: string
+  avatar?: string
+  github?: string
+  gitlab?: string
+  dockerhub?: string
+  language?: string
+  timezone?: string
   created_at: string
   updated_at: string
 }

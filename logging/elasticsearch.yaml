@@ -155,7 +155,7 @@ spec:
         app: elasticsearch
     spec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: standard
+      storageClassName: logging-standard
       resources:
         requests:
           storage: 50Gi

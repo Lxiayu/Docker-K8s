@@ -1,51 +1,58 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { authApi } from '@/services/auth'
 import { User, Lock, Mail, ArrowLeft, CheckCircle } from 'lucide-react'
 
+const registerSchema = z.object({
+  username: z.string().min(3, '用户名至少3个字符'),
+  email: z.string().email('请输入有效的邮箱地址'),
+  password: z.string()
+    .min(8, '密码至少8个字符')
+    .regex(/[a-z]/, '密码需包含小写字母')
+    .regex(/[A-Z]/, '密码需包含大写字母')
+    .regex(/[0-9]/, '密码需包含数字'),
+  confirmPassword: z.string(),
+  real_name: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: '两次密码输入不一致',
+  path: ['confirmPassword'],
+})
+
+type RegisterForm = z.infer<typeof registerSchema>
+
 export default function Register() {
   const navigate = useNavigate()
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-  }
+  const form = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      real_name: '',
+    },
+  })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (data: RegisterForm) => {
     setError('')
-    
-    if (formData.password !== formData.confirmPassword) {
-      setError('两次输入的密码不一致')
-      return
-    }
-    
-    if (formData.password.length < 6) {
-      setError('密码长度至少6位')
-      return
-    }
-    
     setLoading(true)
     
     try {
       await authApi.register({
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
+        username: data.username,
+        email: data.email,
+        password: data.password,
       })
       setSuccess(true)
       setTimeout(() => {
@@ -94,7 +101,7 @@ export default function Register() {
             </CardDescription>
           </CardHeader>
           
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
             <CardContent className="space-y-4">
               {error && (
                 <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
@@ -103,75 +110,87 @@ export default function Register() {
               )}
               
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
+                <Label htmlFor="username">
                   用户名
-                </label>
+                </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="username"
                     type="text"
-                    name="username"
                     placeholder="请输入用户名"
-                    value={formData.username}
-                    onChange={handleChange}
                     className="pl-10"
-                    required
+                    {...form.register('username')}
                   />
                 </div>
+                {form.formState.errors.username && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.username.message}
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
+                <Label htmlFor="email">
                   邮箱
-                </label>
+                </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="email"
                     type="email"
-                    name="email"
                     placeholder="请输入邮箱"
-                    value={formData.email}
-                    onChange={handleChange}
                     className="pl-10"
-                    required
+                    {...form.register('email')}
                   />
                 </div>
+                {form.formState.errors.email && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.email.message}
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
+                <Label htmlFor="password">
                   密码
-                </label>
+                </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="password"
                     type="password"
-                    name="password"
-                    placeholder="请输入密码（至少6位）"
-                    value={formData.password}
-                    onChange={handleChange}
+                    placeholder="请输入密码（至少8位，含大小写和数字）"
                     className="pl-10"
-                    required
+                    {...form.register('password')}
                   />
                 </div>
+                {form.formState.errors.password && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.password.message}
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
+                <Label htmlFor="confirmPassword">
                   确认密码
-                </label>
+                </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="confirmPassword"
                     type="password"
-                    name="confirmPassword"
                     placeholder="请再次输入密码"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
                     className="pl-10"
-                    required
+                    {...form.register('confirmPassword')}
                   />
                 </div>
+                {form.formState.errors.confirmPassword && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.confirmPassword.message}
+                  </p>
+                )}
               </div>
               
               <Button 
