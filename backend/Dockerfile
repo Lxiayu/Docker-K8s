@@ -20,7 +20,6 @@ RUN apk --no-cache add ca-certificates tzdata \
 WORKDIR /app
 
 COPY --from=builder /build/cicd-platform .
-COPY --from=builder /build/configs ./configs
 
 RUN mkdir -p logs && chown -R appuser:appgroup /app
 
