@@ -43,13 +43,131 @@ env:
   DOCKER_IMAGE_PREFIX: ${{ secrets.DOCKER_USERNAME }}
 
 jobs:
-  setup:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ github.event.inputs.environment || 'dev' }}
+    if: >-
+      github.event.inputs.action == 'deploy' ||
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: |
+          go mod download
+          go test -v ./...
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run test
+
+      - name: Backend security scan
+        if: github.event_name != 'pull_request'
+        run: |
+          cd backend
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.18.2
+          gosec -fmt=json -out=gosec-report.json ./...
+
+      - name: Set up Docker Buildx
+        if: github.event_name != 'pull_request'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Frontend security scan
+        if: github.event_name != 'pull_request'
+        run: |
+          cd frontend
+          npm audit --json > npm-audit-report.json || true
+
+      - name: Build and push backend
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/cicd-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker image security scan
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}'
+          format: 'json'
+          output: 'trivy-backend-report.json'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Docker image security scan (frontend)
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}'
+          format: 'json'
+          output: 'trivy-frontend-report.json'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload security scan reports
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-reports
+          path: |
+            backend/gosec-report.json
+            frontend/npm-audit-report.json
+            trivy-backend-report.json
+            trivy-frontend-report.json
+          retention-days: 7
+
+  provision:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'provision'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate KUBE_CONFIG secret
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "::error::KUBE_CONFIG secret is not set. Please configure it in GitHub Secrets."
+            exit 1
+          fi
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -62,14 +180,6 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
           kubectl cluster-info
-
-  provision:
-    needs: setup
-    runs-on: ubuntu-latest
-    if: github.event.inputs.action == 'provision'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
       - name: Create namespace
         run: |
@@ -112,86 +222,8 @@ jobs:
         run: |
           kubectl apply -f kubernetes/ingress/nginx-ingress.yaml || true
 
-  build:
-    needs: setup
-    runs-on: ubuntu-latest
-    if: github.event.inputs.action == 'deploy' || github.event_name == 'push' || github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Backend security scan
-        run: |
-          cd backend
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.18.2
-          gosec -fmt=json -out=gosec-report.json ./...
-
-      - name: Frontend security scan
-        run: |
-          cd frontend
-          npm ci
-          npm audit --json > npm-audit-report.json || true
-
-      - name: Build and push backend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}
-            ${{ secrets.DOCKER_USERNAME }}/cicd-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}
-            ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Docker image security scan
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}'
-          format: 'json'
-          output: 'trivy-backend-report.json'
-          severity: 'HIGH,CRITICAL'
-
-      - name: Docker image security scan (frontend)
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: '${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}'
-          format: 'json'
-          output: 'trivy-frontend-report.json'
-          severity: 'HIGH,CRITICAL'
-
-      - name: Upload security scan reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-scan-reports
-          path: |
-            backend/gosec-report.json
-            frontend/npm-audit-report.json
-            trivy-backend-report.json
-            trivy-frontend-report.json
-          retention-days: 7
-
   deploy:
-    needs: [setup, build]
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     environment:
@@ -200,6 +232,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate KUBE_CONFIG secret
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "::error::KUBE_CONFIG secret is not set. Please configure it in GitHub Secrets."
+            exit 1
+          fi
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -216,65 +255,51 @@ jobs:
         run: |
           kubectl create secret generic database-secret \
             --from-literal=password=${{ secrets.DATABASE_PASSWORD }} \
-            -n cicd-${{ needs.setup.outputs.environment }} \
+            -n cicd-system \
             --dry-run=client -o yaml | kubectl apply -f -
 
           kubectl create secret generic jwt-secret \
             --from-literal=secret=${{ secrets.JWT_SECRET }} \
-            -n cicd-${{ needs.setup.outputs.environment }} \
+            -n cicd-system \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy using blue-green strategy
         run: |
-          # 部署到绿色环境
           cat kubernetes/backend-blue-green-deployment.yaml | \
             sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-backend:${{ github.sha }}|g" | \
-            kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
+            kubectl apply -n cicd-system -f -
 
-          # 扩展绿色环境
-          kubectl scale deployment cicd-backend-green --replicas=2 -n cicd-${{ needs.setup.outputs.environment }}
+          kubectl scale deployment cicd-backend-green --replicas=2 -n cicd-system
+          kubectl rollout status deployment/cicd-backend-green -n cicd-system --timeout=300s
+          kubectl patch service cicd-backend -n cicd-system --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
 
-          # 等待绿色环境就绪
-          kubectl rollout status deployment/cicd-backend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
-
-          # 切换流量到绿色环境
-          kubectl patch service cicd-backend -n cicd-${{ needs.setup.outputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
-
-          # 前端部署
           cat kubernetes/frontend-blue-green-deployment.yaml | \
             sed "s|image:.*|image: ${{ secrets.DOCKER_USERNAME }}/cicd-frontend:${{ github.sha }}|g" | \
-            kubectl apply -n cicd-${{ needs.setup.outputs.environment }} -f -
+            kubectl apply -n cicd-system -f -
 
-          # 扩展前端绿色环境
-          kubectl scale deployment cicd-frontend-green --replicas=2 -n cicd-${{ needs.setup.outputs.environment }}
-
-          # 等待前端绿色环境就绪
-          kubectl rollout status deployment/cicd-frontend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
-
-          # 切换前端流量到绿色环境
-          kubectl patch service cicd-frontend -n cicd-${{ needs.setup.outputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
-
-      - name: Wait for deployment to be ready
-        run: |
-          kubectl rollout status deployment/cicd-backend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
-          kubectl rollout status deployment/cicd-frontend-green -n cicd-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl scale deployment cicd-frontend-green --replicas=2 -n cicd-system
+          kubectl rollout status deployment/cicd-frontend-green -n cicd-system --timeout=300s
+          kubectl patch service cicd-frontend -n cicd-system --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
 
       - name: Get deployment status
         run: |
           echo "=== Deployment Status ==="
-          kubectl get pods -n cicd-${{ needs.setup.outputs.environment }}
-          kubectl get services -n cicd-${{ needs.setup.outputs.environment }}
-          echo "=== Application URLs ==="
-          echo "Frontend: http://$(kubectl get service cicd-frontend -n cicd-${{ needs.setup.outputs.environment }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo 'pending')"
-          echo "Backend: http://$(kubectl get service cicd-backend -n cicd-${{ needs.setup.outputs.environment }} -o jsonpath='{.spec.clusterIP}'):8080"
+          kubectl get pods -n cicd-system
+          kubectl get services -n cicd-system
 
   rollback:
-    needs: setup
     runs-on: ubuntu-latest
     if: github.event.inputs.action == 'rollback'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate KUBE_CONFIG secret
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "::error::KUBE_CONFIG secret is not set. Please configure it in GitHub Secrets."
+            exit 1
+          fi
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -289,17 +314,14 @@ jobs:
 
       - name: Rollback using blue-green strategy
         run: |
-          # 切换流量回蓝色环境
-          kubectl patch service cicd-backend -n cicd-${{ github.event.inputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
-          kubectl patch service cicd-frontend -n cicd-${{ github.event.inputs.environment }} --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
+          kubectl patch service cicd-backend -n cicd-system --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
+          kubectl patch service cicd-frontend -n cicd-system --type=json -p '[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
 
-          # 缩容绿色环境
-          kubectl scale deployment cicd-backend-green --replicas=0 -n cicd-${{ github.event.inputs.environment }}
-          kubectl scale deployment cicd-frontend-green --replicas=0 -n cicd-${{ github.event.inputs.environment }}
+          kubectl scale deployment cicd-backend-green --replicas=0 -n cicd-system
+          kubectl scale deployment cicd-frontend-green --replicas=0 -n cicd-system
 
-          # 等待蓝色环境就绪
-          kubectl rollout status deployment/cicd-backend-blue -n cicd-${{ github.event.inputs.environment }} --timeout=300s
-          kubectl rollout status deployment/cicd-frontend-blue -n cicd-${{ github.event.inputs.environment }} --timeout=300s
+          kubectl rollout status deployment/cicd-backend-blue -n cicd-system --timeout=300s
+          kubectl rollout status deployment/cicd-frontend-blue -n cicd-system --timeout=300s
 
       - name: Verify rollback
         run: |
@@ -309,12 +331,18 @@ jobs:
           kubectl exec -n cicd-system $BACKEND_POD -- wget -qO- http://localhost:8080/health || exit 1
 
   cleanup:
-    needs: setup
     runs-on: ubuntu-latest
     if: github.event.inputs.action == 'cleanup'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate KUBE_CONFIG secret
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "::error::KUBE_CONFIG secret is not set. Please configure it in GitHub Secrets."
+            exit 1
+          fi
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -329,38 +357,6 @@ jobs:
 
       - name: Cleanup resources
         run: |
-          echo "Cleaning up namespace cicd-${{ github.event.inputs.environment }}..."
-          kubectl delete namespace cicd-${{ github.event.inputs.environment }} --ignore-not-found
+          echo "Cleaning up namespace cicd-system..."
+          kubectl delete namespace cicd-system --ignore-not-found
           echo "Cleanup completed"
-
-  test:
-    needs: setup
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-          cache: true
-
-      - name: Run backend tests
-        working-directory: ./backend
-        run: |
-          go mod download
-          go test -v ./...
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Run frontend tests
-        working-directory: ./frontend
-        run: |
-          npm ci
-          npm run test
