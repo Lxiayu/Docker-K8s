@@ -125,7 +125,7 @@ const statusText: Record<string, string> = {
 export default function Deployments() {
   const [page, setPage] = useState(1)
   const pageSize = 10
-  const [environment, setEnvironment] = useState<string>('')
+  const [environment, setEnvironment] = useState<string>('all')
   const [modalVisible, setModalVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [editingDeployment, setEditingDeployment] = useState<Deployment | null>(null)
@@ -159,7 +159,7 @@ export default function Deployments() {
 
   const { data, isLoading } = useQuery(
     ['deployments', page, pageSize, environment],
-    () => deploymentApi.list({ page, page_size: pageSize, environment: environment || undefined })
+    () => deploymentApi.list({ page, page_size: pageSize, environment: environment === 'all' ? undefined : environment })
   )
 
   const createMutation = useMutation(deploymentApi.create, {
@@ -322,7 +322,7 @@ export default function Deployments() {
                 <SelectValue placeholder="选择环境" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部环境</SelectItem>
+                <SelectItem value="all">全部环境</SelectItem>
                 <SelectItem value="dev">开发环境</SelectItem>
                 <SelectItem value="test">测试环境</SelectItem>
                 <SelectItem value="prod">生产环境</SelectItem>

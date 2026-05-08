@@ -162,7 +162,7 @@ function AlertRuleItem({
 }
 
 export default function Monitoring() {
-  const [severityFilter, setSeverityFilter] = useState<string>('')
+  const [severityFilter, setSeverityFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [alertPage, setAlertPage] = useState(1)
   const alertPageSize = 10
@@ -188,7 +188,7 @@ export default function Monitoring() {
   const { data: alerts = [], isLoading: alertsLoading, refetch: refetchAlerts } = useQuery(
     ['monitoring', 'alerts', severityFilter, searchQuery],
     () => monitoringApi.getAlerts({
-      severity: severityFilter || undefined,
+      severity: severityFilter === 'all' ? undefined : severityFilter,
       search: searchQuery || undefined,
     }),
     { refetchInterval: 30000 }
@@ -317,7 +317,7 @@ export default function Monitoring() {
   }
 
   const filteredAlerts = alerts.filter((alert) => {
-    if (severityFilter && alert.severity !== severityFilter) return false
+    if (severityFilter !== 'all' && alert.severity !== severityFilter) return false
     if (searchQuery && !alert.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !alert.message.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
@@ -386,7 +386,7 @@ export default function Monitoring() {
                     <SelectValue placeholder="全部级别" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部级别</SelectItem>
+                    <SelectItem value="all">全部级别</SelectItem>
                     <SelectItem value="critical">严重</SelectItem>
                     <SelectItem value="warning">警告</SelectItem>
                     <SelectItem value="info">信息</SelectItem>

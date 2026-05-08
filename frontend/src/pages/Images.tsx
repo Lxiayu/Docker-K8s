@@ -109,7 +109,7 @@ function VulnerabilityBadge({ summary }: { summary: { critical: number; high: nu
 export default function Images() {
   const [page, setPage] = useState(1)
   const pageSize = 10
-  const [project, setProject] = useState<string>('')
+  const [project, setProject] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [detailVisible, setDetailVisible] = useState(false)
@@ -134,7 +134,7 @@ export default function Images() {
     () => imageApi.list({ 
       page, 
       page_size: pageSize, 
-      project: project || undefined,
+      project: project === 'all' ? undefined : project,
       search: search || undefined 
     })
   )
@@ -291,7 +291,7 @@ export default function Images() {
             <SelectValue placeholder="选择项目" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">全部项目</SelectItem>
+            <SelectItem value="all">全部项目</SelectItem>
             {projects.map((p) => (
               <SelectItem key={p} value={p}>{p}</SelectItem>
             ))}
@@ -576,17 +576,17 @@ export default function Images() {
             <div className="grid gap-2">
               <Label htmlFor="repository">代码仓库（可选）</Label>
               <Select
-                value={buildForm.repository_id?.toString() || ''}
+                value={buildForm.repository_id?.toString() || 'none'}
                 onValueChange={(value) => setBuildForm({ 
                   ...buildForm, 
-                  repository_id: value ? Number(value) : undefined 
+                  repository_id: value === 'none' ? undefined : Number(value) 
                 })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择代码仓库" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">不使用仓库</SelectItem>
+                  <SelectItem value="none">不使用仓库</SelectItem>
                   {(reposData?.list || []).map((repo) => (
                     <SelectItem key={repo.id} value={String(repo.id)}>
                       {repo.name}

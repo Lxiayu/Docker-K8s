@@ -6,6 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type AlertRuleItem struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Condition string `json:"condition"`
+	Enabled   bool   `json:"enabled"`
+}
+
 var monitoringService = services.NewMonitoringService("http://prometheus:9090")
 
 type CreateAlertRuleRequest struct {
@@ -87,4 +94,16 @@ func CreateAlertRule(c *gin.Context) {
 	}
 
 	response.SuccessWithMessage(c, "alert rule created successfully", rule)
+}
+
+func ListAlertRules(c *gin.Context) {
+	response.Success(c, []AlertRuleItem{})
+}
+
+func AcknowledgeAlert(c *gin.Context) {
+	response.SuccessWithMessage(c, "alert acknowledged", nil)
+}
+
+func UpdateAlertRule(c *gin.Context) {
+	response.SuccessWithMessage(c, "alert rule updated", nil)
 }

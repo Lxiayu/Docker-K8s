@@ -128,6 +128,9 @@ func Setup(engine *gin.Engine) {
 			monitoring.GET("/metrics", handlers.GetMetrics)
 			monitoring.GET("/alerts", handlers.ListAlerts)
 			monitoring.POST("/alerts/rules", handlers.CreateAlertRule)
+			monitoring.GET("/alerts/rules", handlers.ListAlertRules)
+			monitoring.PUT("/alerts/rules/:id", handlers.UpdateAlertRule)
+			monitoring.POST("/alerts/:id/acknowledge", handlers.AcknowledgeAlert)
 		}
 
 		settings := api.Group("/settings").Use(middleware.JWTAuth())
@@ -140,6 +143,11 @@ func Setup(engine *gin.Engine) {
 		dashboard := api.Group("/dashboard").Use(middleware.JWTAuth())
 		{
 			dashboard.GET("/stats", handlers.GetDashboardStats)
+		}
+
+		audit := api.Group("/audit").Use(middleware.JWTAuth())
+		{
+			audit.GET("/logs", handlers.ListAuditLogs)
 		}
 	}
 }
