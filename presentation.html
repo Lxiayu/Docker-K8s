@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云原生容器化CI/CD自动化部署系统 - 答辩讲解</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --electric-blue: #0066ff;
+  --neon-cyan: #00ffff;
+  --dark-bg: #0a0a0f;
+  --dark-card: #12121a;
+  --dark-surface: #1a1a2e;
+  --white: #ffffff;
+  --gray-100: #f0f0f5;
+  --gray-300: #b0b0c0;
+  --gray-500: #6b6b80;
+  --accent-green: #00ff88;
+  --accent-orange: #ff8800;
+  --accent-red: #ff3366;
+  --accent-purple: #a855f7;
+  --gradient-1: linear-gradient(135deg, #0066ff, #00ffff);
+  --gradient-2: linear-gradient(135deg, #a855f7, #0066ff);
+  --gradient-3: linear-gradient(135deg, #00ff88, #00ffff);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: var(--electric-blue) var(--dark-bg);
+}
+
+body {
+  font-family: 'Noto Sans SC', sans-serif;
+  background: var(--dark-bg);
+  color: var(--white);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--dark-bg); }
+::-webkit-scrollbar-thumb { background: var(--electric-blue); border-radius: 3px; }
+
+.slide {
+  min-height: 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+.slide::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0,102,255,0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.slide-number {
+  position: absolute;
+  top: 30px;
+  right: 40px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--gray-500);
+  letter-spacing: 2px;
+}
+
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--gradient-1);
+  z-index: 1000;
+  transition: width 0.3s ease;
+}
+
+.nav-dots {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nav-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gray-500);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  outline: none;
+}
+
+.nav-dot.active {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+  transform: scale(1.4);
+}
+
+h1 {
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1.2;
+  margin-bottom: 20px;
+  letter-spacing: -1px;
+}
+
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  background: var(--gradient-1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+h3 {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--neon-cyan);
+  margin-bottom: 12px;
+}
+
+.subtitle {
+  font-size: 22px;
+  color: var(--gray-300);
+  font-weight: 300;
+  margin-bottom: 40px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 4px;
+  letter-spacing: 0.5px;
+}
+
+.tag-blue { background: rgba(0,102,255,0.15); color: var(--electric-blue); border: 1px solid rgba(0,102,255,0.3); }
+.tag-cyan { background: rgba(0,255,255,0.1); color: var(--neon-cyan); border: 1px solid rgba(0,255,255,0.3); }
+.tag-green { background: rgba(0,255,136,0.1); color: var(--accent-green); border: 1px solid rgba(0,255,136,0.3); }
+.tag-orange { background: rgba(255,136,0,0.1); color: var(--accent-orange); border: 1px solid rgba(255,136,0,0.3); }
+.tag-purple { background: rgba(168,85,247,0.1); color: var(--accent-purple); border: 1px solid rgba(168,85,247,0.3); }
+.tag-red { background: rgba(255,51,102,0.1); color: var(--accent-red); border: 1px solid rgba(255,51,102,0.3); }
+
+.card {
+  background: var(--dark-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 28px;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: rgba(0,102,255,0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,102,255,0.1);
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; width: 100%; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; width: 100%; }
+
+.icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.icon-box.blue { background: rgba(0,102,255,0.15); }
+.icon-box.cyan { background: rgba(0,255,255,0.1); }
+.icon-box.green { background: rgba(0,255,136,0.1); }
+.icon-box.orange { background: rgba(255,136,0,0.1); }
+.icon-box.purple { background: rgba(168,85,247,0.1); }
+.icon-box.red { background: rgba(255,51,102,0.1); }
+
+.flow-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.flow-step {
+  background: var(--dark-surface);
+  border: 1px solid rgba(0,102,255,0.2);
+  border-radius: 12px;
+  padding: 14px 20px;
+  text-align: center;
+  min-width: 120px;
+}
+
+.flow-step .step-icon { font-size: 24px; margin-bottom: 6px; }
+.flow-step .step-label { font-size: 13px; color: var(--gray-300); }
+
+.flow-arrow {
+  color: var(--electric-blue);
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.arch-layer {
+  width: 100%;
+  border-radius: 16px;
+  padding: 24px 28px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.arch-layer-ui {
+  background: linear-gradient(135deg, rgba(0,102,255,0.12), rgba(0,255,255,0.06));
+  border: 1px solid rgba(0,102,255,0.25);
+}
+
+.arch-layer-service {
+  background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(0,102,255,0.06));
+  border: 1px solid rgba(168,85,247,0.25);
+}
+
+.arch-layer-infra {
+  background: linear-gradient(135deg, rgba(0,255,136,0.1), rgba(0,255,255,0.06));
+  border: 1px solid rgba(0,255,136,0.25);
+}
+
+.arch-layer-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arch-layer-title .layer-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.arch-items {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.arch-item {
+  background: rgba(0,0,0,0.3);
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.code-block {
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 20px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-x: auto;
+  color: var(--gray-300);
+  width: 100%;
+}
+
+.code-block .keyword { color: var(--accent-purple); }
+.code-block .string { color: var(--accent-green); }
+.code-block .comment { color: var(--gray-500); }
+.code-block .type { color: var(--neon-cyan); }
+
+.stat-number {
+  font-size: 48px;
+  font-weight: 900;
+  background: var(--gradient-1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--gray-300);
+  margin-top: 8px;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  background: rgba(0,102,255,0.12);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--neon-cyan);
+  border-bottom: 1px solid rgba(0,102,255,0.2);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--gray-300);
+}
+
+.data-table tr:hover td {
+  background: rgba(0,102,255,0.04);
+}
+
+.highlight-box {
+  background: linear-gradient(135deg, rgba(0,102,255,0.1), rgba(0,255,255,0.05));
+  border: 1px solid rgba(0,102,255,0.2);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 12px 0;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 30px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--gradient-1);
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 24px;
+  padding-left: 20px;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -26px;
+  top: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--electric-blue);
+  box-shadow: 0 0 12px rgba(0,102,255,0.5);
+}
+
+.timeline-item .time-label {
+  font-size: 13px;
+  color: var(--neon-cyan);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.timeline-item .time-content {
+  font-size: 15px;
+  color: var(--gray-300);
+}
+
+.demo-screen {
+  background: var(--dark-surface);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.demo-toolbar {
+  background: rgba(0,0,0,0.4);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.demo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.demo-dot.red { background: #ff5f57; }
+.demo-dot.yellow { background: #ffbd2e; }
+.demo-dot.green { background: #28c840; }
+
+.demo-url {
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(0,0,0,0.3);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+.demo-content {
+  padding: 24px;
+  min-height: 200px;
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulse 2s infinite;
+  margin-right: 8px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,255,136,0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(0,255,136,0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s ease;
+}
+
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stagger-1 { transition-delay: 0.1s; }
+.stagger-2 { transition-delay: 0.2s; }
+.stagger-3 { transition-delay: 0.3s; }
+.stagger-4 { transition-delay: 0.4s; }
+.stagger-5 { transition-delay: 0.5s; }
+.stagger-6 { transition-delay: 0.6s; }
+
+.glow-text {
+  text-shadow: 0 0 20px rgba(0,102,255,0.3), 0 0 40px rgba(0,102,255,0.1);
+}
+
+.section-divider {
+  width: 60px;
+  height: 3px;
+  background: var(--gradient-1);
+  border-radius: 2px;
+  margin-bottom: 24px;
+}
+
+.full-width { width: 100%; }
+
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-col { display: flex; flex-direction: column; }
+.gap-8 { gap: 8px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.mb-32 { margin-bottom: 32px; }
+.mt-16 { margin-top: 16px; }
+.text-center { text-align: center; }
+.text-sm { font-size: 14px; }
+.text-xs { font-size: 12px; }
+.text-gray { color: var(--gray-300); }
+.text-cyan { color: var(--neon-cyan); }
+.text-blue { color: var(--electric-blue); }
+
+.deployment-strategy {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.strategy-card {
+  flex: 1;
+  background: var(--dark-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.strategy-card:hover {
+  border-color: rgba(0,102,255,0.3);
+  transform: translateY(-4px);
+}
+
+.strategy-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.strategy-name {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.strategy-desc {
+  font-size: 13px;
+  color: var(--gray-300);
+  line-height: 1.5;
+}
+
+.footer-note {
+  position: absolute;
+  bottom: 30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--gray-300);
+}
+
+@media (max-width: 1024px) {
+  .slide { padding: 40px 30px; }
+  h1 { font-size: 36px; }
+  h2 { font-size: 28px; }
+  .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+  .deployment-strategy { flex-direction: column; }
+}
+
+@media (max-width: 640px) {
+  .slide { padding: 30px 20px; }
+  h1 { font-size: 28px; }
+  h2 { font-size: 22px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="nav-dots" id="navDots"></div>
+
+<!-- ==================== SLIDE 1: 封面 ==================== -->
+<section class="slide" id="slide-1" data-slide="1">
+  <div class="slide-number">01 / 12</div>
+  <div style="text-align:center; max-width:900px;">
+    <div class="animate-on-scroll">
+      <div style="margin-bottom:32px;">
+        <span class="tag tag-blue">CLOUD NATIVE</span>
+        <span class="tag tag-cyan">CI/CD</span>
+        <span class="tag tag-green">KUBERNETES</span>
+      </div>
+      <h1 class="glow-text" style="font-size:52px; margin-bottom:16px;">云原生容器化<br>CI/CD 自动化部署系统</h1>
+      <p class="subtitle" style="font-size:20px; margin-bottom:40px;">代码即部署，部署即生效 —— 从代码提交到生产部署的全流程自动化</p>
+      <div style="display:flex; justify-content:center; gap:20px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="pulse-dot"></span>
+          <span class="text-sm text-gray">Go + React</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="pulse-dot"></span>
+          <span class="text-sm text-gray">Docker + Kubernetes</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="pulse-dot"></span>
+          <span class="text-sm text-gray">Prometheus + Grafana</span>
+        </div>
+      </div>
+    </div>
+    <div class="animate-on-scroll stagger-2" style="margin-top:60px;">
+      <p class="text-xs text-gray">按 <span class="kbd">↓</span> 或滚动鼠标继续  |  共 12 页  |  预计讲解 5+ 分钟</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 2: 项目背景 ==================== -->
+<section class="slide" id="slide-2" data-slide="2">
+  <div class="slide-number">02 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>项目背景与痛点</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-32">传统部署方式在微服务和云原生时代面临严峻挑战</p>
+    </div>
+    <div class="grid-2">
+      <div class="animate-on-scroll stagger-1">
+        <div class="card" style="border-left:3px solid var(--accent-red);">
+          <div style="font-size:28px; margin-bottom:12px;">😰</div>
+          <h3 style="color:var(--accent-red);">环境不一致</h3>
+          <p class="text-sm text-gray">开发、测试、生产环境配置差异导致"在我机器上能跑"问题，部署失败率高，排查成本高</p>
+        </div>
+      </div>
+      <div class="animate-on-scroll stagger-2">
+        <div class="card" style="border-left:3px solid var(--accent-orange);">
+          <div style="font-size:28px; margin-bottom:12px;">🐢</div>
+          <h3 style="color:var(--accent-orange);">效率低下</h3>
+          <p class="text-sm text-gray">人工部署耗时长，发布频率受限，业务迭代速度慢，运维成本居高不下</p>
+        </div>
+      </div>
+      <div class="animate-on-scroll stagger-3">
+        <div class="card" style="border-left:3px solid var(--accent-purple);">
+          <div style="font-size:28px; margin-bottom:12px;">💥</div>
+          <h3 style="color:var(--accent-purple);">故障恢复慢</h3>
+          <p class="text-sm text-gray">出现问题后手动回滚耗时长，业务损失扩大，MTTR难以保障</p>
+        </div>
+      </div>
+      <div class="animate-on-scroll stagger-4">
+        <div class="card" style="border-left:3px solid var(--electric-blue);">
+          <div style="font-size:28px; margin-bottom:12px;">🔒</div>
+          <h3 style="color:var(--electric-blue);">安全隐患</h3>
+          <p class="text-sm text-gray">依赖冲突、镜像漏洞、权限混乱，缺乏统一的安全管控和审计追踪</p>
+        </div>
+      </div>
+    </div>
+    <div class="animate-on-scroll stagger-5" style="margin-top:32px;">
+      <div class="highlight-box" style="text-align:center;">
+        <p style="font-size:15px; color:var(--neon-cyan); font-weight:600;">行业数据</p>
+        <div style="display:flex; justify-content:center; gap:48px; margin-top:16px; flex-wrap:wrap;">
+          <div><span class="stat-number" style="font-size:36px;">85%</span><br><span class="text-xs text-gray">企业因依赖升级导致服务中断</span></div>
+          <div><span class="stat-number" style="font-size:36px;">70%</span><br><span class="text-xs text-gray">人工干预错误可被自动化消除</span></div>
+          <div><span class="stat-number" style="font-size:36px;">80%+</span><br><span class="text-xs text-gray">部署时间可被缩短</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 3: 系统概述 ==================== -->
+<section class="slide" id="slide-3" data-slide="3">
+  <div class="slide-number">03 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>系统概述</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-32">一套完整的云原生容器化 CI/CD 自动化部署系统，实现从代码提交到生产部署的全流程自动化</p>
+    </div>
+    <div class="grid-3 animate-on-scroll stagger-1">
+      <div class="card" style="text-align:center;">
+        <div class="icon-box blue" style="margin:0 auto 16px;">🔄</div>
+        <h3>全流程自动化</h3>
+        <p class="text-sm text-gray">代码提交 → 镜像构建 → 测试验证 → 自动部署，端到端零人工干预</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box cyan" style="margin:0 auto 16px;">🌐</div>
+        <h3>多环境支持</h3>
+        <p class="text-sm text-gray">开发、测试、生产环境隔离与统一管理，配置即代码</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box green" style="margin:0 auto 16px;">🚀</div>
+        <h3>高级部署策略</h3>
+        <p class="text-sm text-gray">滚动更新、灰度发布、蓝绿部署，支持自动回滚</p>
+      </div>
+    </div>
+    <div class="grid-3 animate-on-scroll stagger-2" style="margin-top:20px;">
+      <div class="card" style="text-align:center;">
+        <div class="icon-box orange" style="margin:0 auto 16px;">📊</div>
+        <h3>实时监控告警</h3>
+        <p class="text-sm text-gray">Prometheus + Grafana 全方位监控，多渠道告警通知</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box purple" style="margin:0 auto 16px;">🛡️</div>
+        <h3>安全管理</h3>
+        <p class="text-sm text-gray">镜像漏洞扫描、RBAC 权限控制、全量审计日志</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box red" style="margin:0 auto 16px;">💻</div>
+        <h3>Web 可视化</h3>
+        <p class="text-sm text-gray">现代化前端界面，操作简单直观，支持明暗主题切换</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 4: 技术架构 ==================== -->
+<section class="slide" id="slide-4" data-slide="4">
+  <div class="slide-number">04 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>系统架构设计</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">三层分层架构：用户界面层 → 应用服务层 → 基础设施层</p>
+    </div>
+
+    <div class="arch-layer arch-layer-ui animate-on-scroll stagger-1">
+      <div class="arch-layer-title">
+        🖥️ 用户界面层
+        <span class="layer-badge" style="background:rgba(0,102,255,0.2); color:var(--electric-blue);">UI LAYER</span>
+      </div>
+      <div class="arch-items">
+        <div class="arch-item"><span>⚛️</span> React 18 + TypeScript</div>
+        <div class="arch-item"><span>🎨</span> Radix UI + Tailwind CSS</div>
+        <div class="arch-item"><span>📦</span> Zustand 状态管理</div>
+        <div class="arch-item"><span>⚡</span> Vite 构建</div>
+        <div class="arch-item"><span>📊</span> Recharts 图表</div>
+      </div>
+    </div>
+
+    <div style="text-align:center; color:var(--electric-blue); font-size:20px; margin:4px 0;">▼</div>
+
+    <div class="arch-layer arch-layer-service animate-on-scroll stagger-2">
+      <div class="arch-layer-title">
+        ⚙️ 应用服务层
+        <span class="layer-badge" style="background:rgba(168,85,247,0.2); color:var(--accent-purple);">SERVICE LAYER</span>
+      </div>
+      <div class="arch-items">
+        <div class="arch-item"><span>🔧</span> Go 1.21 + Gin</div>
+        <div class="arch-item"><span>🗄️</span> GORM + PostgreSQL</div>
+        <div class="arch-item"><span>🔑</span> JWT 认证</div>
+        <div class="arch-item"><span>📝</span> Zap 日志</div>
+        <div class="arch-item"><span>⚙️</span> Viper 配置</div>
+        <div class="arch-item"><span>💾</span> Redis 缓存</div>
+      </div>
+    </div>
+
+    <div style="text-align:center; color:var(--accent-purple); font-size:20px; margin:4px 0;">▼</div>
+
+    <div class="arch-layer arch-layer-infra animate-on-scroll stagger-3">
+      <div class="arch-layer-title">
+        🏗️ 基础设施层
+        <span class="layer-badge" style="background:rgba(0,255,136,0.2); color:var(--accent-green);">INFRA LAYER</span>
+      </div>
+      <div class="arch-items">
+        <div class="arch-item"><span>🐳</span> Docker</div>
+        <div class="arch-item"><span>☸️</span> Kubernetes</div>
+        <div class="arch-item"><span>🏛️</span> Harbor</div>
+        <div class="arch-item"><span>📈</span> Prometheus + Grafana</div>
+        <div class="arch-item"><span>📋</span> ELK Stack</div>
+        <div class="arch-item"><span>🔐</span> Vault</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 5: 核心业务流程 ==================== -->
+<section class="slide" id="slide-5" data-slide="5">
+  <div class="slide-number">05 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>核心业务流程</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-32">从代码提交到生产部署的完整 CI/CD 数据流</p>
+    </div>
+
+    <div class="animate-on-scroll stagger-1">
+      <div class="flow-container" style="margin-bottom:32px;">
+        <div class="flow-step" style="border-color:rgba(0,102,255,0.4);">
+          <div class="step-icon">📝</div>
+          <div class="step-label">代码提交</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(0,102,255,0.4);">
+          <div class="step-icon">🔗</div>
+          <div class="step-label">Webhook触发</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(168,85,247,0.4);">
+          <div class="step-icon">🔨</div>
+          <div class="step-label">CI流水线</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(168,85,247,0.4);">
+          <div class="step-icon">🐳</div>
+          <div class="step-label">镜像构建</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(255,136,0,0.4);">
+          <div class="step-icon">🔍</div>
+          <div class="step-label">镜像扫描</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="animate-on-scroll stagger-2">
+      <div class="flow-container" style="margin-bottom:32px;">
+        <div class="flow-step" style="border-color:rgba(255,136,0,0.4);">
+          <div class="step-icon">🏛️</div>
+          <div class="step-label">推送仓库</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(0,255,136,0.4);">
+          <div class="step-icon">☸️</div>
+          <div class="step-label">K8s部署</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(0,255,136,0.4);">
+          <div class="step-icon">✅</div>
+          <div class="step-label">测试验证</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(0,255,136,0.4);">
+          <div class="step-icon">🚀</div>
+          <div class="step-label">灰度发布</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(0,255,255,0.4);">
+          <div class="step-icon">📊</div>
+          <div class="step-label">监控告警</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3 animate-on-scroll stagger-3">
+      <div class="highlight-box">
+        <p style="color:var(--neon-cyan); font-weight:600; margin-bottom:8px;">⚡ 触发延迟 ≤ 5秒</p>
+        <p class="text-sm text-gray">代码提交后 Webhook 实时触发流水线</p>
+      </div>
+      <div class="highlight-box">
+        <p style="color:var(--neon-cyan); font-weight:600; margin-bottom:8px;">🔨 构建时间 ≤ 10分钟</p>
+        <p class="text-sm text-gray">多阶段构建 + 缓存优化加速</p>
+      </div>
+      <div class="highlight-box">
+        <p style="color:var(--neon-cyan); font-weight:600; margin-bottom:8px;">🚀 部署时间 ≤ 2分钟</p>
+        <p class="text-sm text-gray">Kubernetes 滚动更新零停机</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 6: 后端架构 ==================== -->
+<section class="slide" id="slide-6" data-slide="6">
+  <div class="slide-number">06 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>后端服务架构</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">基于 Go + Gin 构建的高性能微服务后端，采用经典分层架构</p>
+    </div>
+
+    <div class="grid-2 animate-on-scroll stagger-1">
+      <div>
+        <h3 style="margin-bottom:16px;">📐 分层架构</h3>
+        <div class="code-block">
+<span class="comment">// 请求处理链路</span>
+Router → Middleware → Handler → Service → Model
+
+<span class="comment">// 路由层 - API 定义与分组</span>
+<span class="type">api</span> := engine.Group(<span class="string">"/api/v1"</span>)
+  ├── <span class="type">auth</span>     → 登录 / 注册
+  ├── <span class="type">users</span>    → 用户管理 (JWT Auth)
+  ├── <span class="type">pipelines</span> → 流水线管理
+  ├── <span class="type">deployments</span> → 部署管理
+  ├── <span class="type">images</span>   → 镜像管理
+  ├── <span class="type">monitoring</span> → 监控告警
+  ├── <span class="type">settings</span> → 系统配置
+  ├── <span class="type">dashboard</span> → 数据看板
+  └── <span class="type">audit</span>    → 审计日志</div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:16px;">🧩 核心服务模块</h3>
+        <div class="grid-2" style="gap:12px;">
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">AuthService</p>
+            <p class="text-xs text-gray">JWT认证 · bcrypt加密</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">PipelineService</p>
+            <p class="text-xs text-gray">流水线编排 · 执行引擎</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">K8sService</p>
+            <p class="text-xs text-gray">集群管理 · 自动回滚</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">BuildService</p>
+            <p class="text-xs text-gray">多阶段构建 · 缓存优化</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">HarborService</p>
+            <p class="text-xs text-gray">镜像仓库 · 漏洞扫描</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">RBACService</p>
+            <p class="text-xs text-gray">角色权限 · 细粒度控制</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">GitService</p>
+            <p class="text-xs text-gray">Webhook · 仓库集成</p>
+          </div>
+          <div class="card" style="padding:16px;">
+            <p style="font-weight:600; font-size:14px;">MonitoringService</p>
+            <p class="text-xs text-gray">指标采集 · 告警规则</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="animate-on-scroll stagger-2" style="margin-top:20px;">
+      <h3 style="margin-bottom:12px;">🛡️ 中间件链</h3>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <span class="tag tag-blue">JWT Auth 认证</span>
+        <span class="tag tag-cyan">CORS 跨域</span>
+        <span class="tag tag-green">Logger 日志</span>
+        <span class="tag tag-orange">Recovery 异常恢复</span>
+        <span class="tag tag-purple">RateLimit 限流</span>
+        <span class="tag tag-red">Performance 性能监控</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 7: 前端架构 ==================== -->
+<section class="slide" id="slide-7" data-slide="7">
+  <div class="slide-number">07 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>前端控制台</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">React 18 + TypeScript 构建的现代化 Web 控制台</p>
+    </div>
+
+    <div class="grid-2 animate-on-scroll stagger-1">
+      <div>
+        <div class="demo-screen">
+          <div class="demo-toolbar">
+            <div class="demo-dot red"></div>
+            <div class="demo-dot yellow"></div>
+            <div class="demo-dot green"></div>
+            <span class="demo-url">localhost:3000/dashboard</span>
+          </div>
+          <div class="demo-content">
+            <div style="display:flex; gap:12px; margin-bottom:16px;">
+              <div style="flex:1; background:rgba(0,102,255,0.1); border-radius:8px; padding:14px; text-align:center;">
+                <div style="font-size:24px; font-weight:900; color:var(--electric-blue);">128</div>
+                <div class="text-xs text-gray">流水线总数</div>
+              </div>
+              <div style="flex:1; background:rgba(0,255,136,0.1); border-radius:8px; padding:14px; text-align:center;">
+                <div style="font-size:24px; font-weight:900; color:var(--accent-green);">96.5%</div>
+                <div class="text-xs text-gray">构建成功率</div>
+              </div>
+              <div style="flex:1; background:rgba(168,85,247,0.1); border-radius:8px; padding:14px; text-align:center;">
+                <div style="font-size:24px; font-weight:900; color:var(--accent-purple);">45</div>
+                <div class="text-xs text-gray">活跃部署</div>
+              </div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3); border-radius:8px; padding:12px;">
+              <div style="font-size:12px; color:var(--gray-500); margin-bottom:8px;">最近构建</div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span style="color:var(--accent-green);">●</span>
+                <span class="text-sm">frontend-app #256</span>
+                <span class="text-xs text-gray" style="margin-left:auto;">2m ago</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span style="color:var(--accent-green);">●</span>
+                <span class="text-sm">backend-api #189</span>
+                <span class="text-xs text-gray" style="margin-left:auto;">5m ago</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:var(--accent-red);">●</span>
+                <span class="text-sm">auth-service #92</span>
+                <span class="text-xs text-gray" style="margin-left:auto;">12m ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:16px;">📄 核心页面</h3>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div class="card" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:20px;">📊</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">Dashboard 仪表盘</p>
+              <p class="text-xs text-gray">系统概览、关键指标、实时状态</p>
+            </div>
+          </div>
+          <div class="card" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:20px;">🔄</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">Pipelines 流水线</p>
+              <p class="text-xs text-gray">创建、编辑、触发、查看构建日志</p>
+            </div>
+          </div>
+          <div class="card" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:20px;">🚀</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">Deployments 部署管理</p>
+              <p class="text-xs text-gray">多策略部署、回滚、Pod监控</p>
+            </div>
+          </div>
+          <div class="card" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:20px;">🐳</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">Images 镜像管理</p>
+              <p class="text-xs text-gray">镜像列表、构建、漏洞扫描</p>
+            </div>
+          </div>
+          <div class="card" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:20px;">📈</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">Monitoring 监控告警</p>
+              <p class="text-xs text-gray">实时指标、告警规则、通知配置</p>
+            </div>
+          </div>
+          <div class="card" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:20px;">👥</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">Users 用户管理</p>
+              <p class="text-xs text-gray">RBAC角色、权限分配、审计日志</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 8: 数据库设计 ==================== -->
+<section class="slide" id="slide-8" data-slide="8">
+  <div class="slide-number">08 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>数据库设计</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">PostgreSQL 数据库，GORM 自动迁移，完善的索引与约束设计</p>
+    </div>
+
+    <div class="grid-2 animate-on-scroll stagger-1">
+      <div>
+        <h3 style="margin-bottom:16px;">🗂️ 核心数据模型</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>数据表</th>
+                <th>说明</th>
+                <th>关键字段</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color:var(--electric-blue); font-weight:600;">users</td>
+                <td>用户表</td>
+                <td class="text-xs">username, email, role, status</td>
+              </tr>
+              <tr>
+                <td style="color:var(--electric-blue); font-weight:600;">roles</td>
+                <td>角色表</td>
+                <td class="text-xs">name, description</td>
+              </tr>
+              <tr>
+                <td style="color:var(--electric-blue); font-weight:600;">permissions</td>
+                <td>权限表</td>
+                <td class="text-xs">resource, action</td>
+              </tr>
+              <tr>
+                <td style="color:var(--neon-cyan); font-weight:600;">git_repositories</td>
+                <td>代码仓库</td>
+                <td class="text-xs">url, type, branch, webhook</td>
+              </tr>
+              <tr>
+                <td style="color:var(--neon-cyan); font-weight:600;">pipelines</td>
+                <td>流水线</td>
+                <td class="text-xs">repo_id, config, status</td>
+              </tr>
+              <tr>
+                <td style="color:var(--neon-cyan); font-weight:600;">builds</td>
+                <td>构建记录</td>
+                <td class="text-xs">pipeline_id, commit_hash, duration</td>
+              </tr>
+              <tr>
+                <td style="color:var(--accent-green); font-weight:600;">deployments</td>
+                <td>部署记录</td>
+                <td class="text-xs">namespace, image, strategy, env</td>
+              </tr>
+              <tr>
+                <td style="color:var(--accent-orange); font-weight:600;">audit_logs</td>
+                <td>审计日志</td>
+                <td class="text-xs">user_id, action, resource, ip</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:16px;">🔐 RBAC 权限模型</h3>
+        <div class="code-block" style="font-size:12px;">
+<span class="comment">// 角色-权限 多对多关联</span>
+<span class="type">Role</span> ←(many2many)→ <span class="type">Permission</span>
+
+<span class="comment">// 四级角色体系</span>
+┌─────────┬──────────────────────────┐
+│ <span class="keyword">admin</span>    │ 全部权限                  │
+│ <span class="keyword">devops</span>   │ 流水线+部署+仓库+监控      │
+│ <span class="keyword">developer</span>│ 只读权限                  │
+│ <span class="keyword">viewer</span>   │ 只读权限                  │
+└─────────┴──────────────────────────┘
+
+<span class="comment">// 权限粒度: resource + action</span>
+pipelines:create  pipelines:trigger
+deployments:execute  monitoring:update
+
+<span class="comment">// 数据库视图</span>
+user_permissions     → 用户权限视图
+pipeline_statistics  → 流水线统计视图</div>
+        <div style="margin-top:16px;">
+          <h3 style="margin-bottom:12px;">✨ 设计亮点</h3>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="color:var(--accent-green);">✓</span>
+              <span class="text-sm text-gray">软删除 (deleted_at) 保护数据</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="color:var(--accent-green);">✓</span>
+              <span class="text-sm text-gray">自动更新时间触发器</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="color:var(--accent-green);">✓</span>
+              <span class="text-sm text-gray">枚举类型约束 (build_status, deployment_strategy)</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="color:var(--accent-green);">✓</span>
+              <span class="text-sm text-gray">审计日志自动清理函数 (90天)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 9: 部署策略 ==================== -->
+<section class="slide" id="slide-9" data-slide="9">
+  <div class="slide-number">09 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>部署策略与 Kubernetes 集成</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">三种高级部署策略，保障零停机发布与快速故障恢复</p>
+    </div>
+
+    <div class="deployment-strategy animate-on-scroll stagger-1">
+      <div class="strategy-card" style="border-top:3px solid var(--electric-blue);">
+        <div class="strategy-icon">🔄</div>
+        <div class="strategy-name" style="color:var(--electric-blue);">滚动更新</div>
+        <div class="strategy-desc">
+          逐步替换旧版本 Pod<br>
+          配置 maxSurge / maxUnavailable<br>
+          就绪探针保障可用性<br>
+          <span style="color:var(--accent-green);">可用性 ≥ 99.99%</span>
+        </div>
+      </div>
+      <div class="strategy-card" style="border-top:3px solid var(--accent-purple);">
+        <div class="strategy-icon">🐦</div>
+        <div class="strategy-name" style="color:var(--accent-purple);">灰度发布</div>
+        <div class="strategy-desc">
+          金丝雀发布策略<br>
+          流量权重 1% → 100%<br>
+          基于指标自动判断<br>
+          <span style="color:var(--accent-green);">用户无感知切换</span>
+        </div>
+      </div>
+      <div class="strategy-card" style="border-top:3px solid var(--neon-cyan);">
+        <div class="strategy-icon">🔵🟢</div>
+        <div class="strategy-name" style="color:var(--neon-cyan);">蓝绿部署</div>
+        <div class="strategy-desc">
+          两套完整环境切换<br>
+          零风险即时回滚<br>
+          切换流量即可完成<br>
+          <span style="color:var(--accent-green);">回滚时间 ≤ 2分钟</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2 animate-on-scroll stagger-2" style="margin-top:28px;">
+      <div>
+        <h3 style="margin-bottom:12px;">☸️ K8s 资源配置</h3>
+        <div class="code-block" style="font-size:12px;">
+<span class="comment">// Kubernetes 部署架构</span>
+├── <span class="type">Deployment</span>      → 应用部署
+├── <span class="type">Service</span>         → 服务暴露
+├── <span class="type">Ingress</span>         → 流量路由
+├── <span class="type">HPA</span>            → 弹性伸缩
+├── <span class="type">PDB</span>            → Pod中断预算
+├── <span class="type">ConfigMap</span>       → 配置管理
+├── <span class="type">Secret</span>         → 密钥管理
+├── <span class="type">NetworkPolicy</span>   → 网络隔离
+└── <span class="type">PVC</span>            → 持久化存储</div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:12px;">🛡️ 高可用保障</h3>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="highlight-box" style="padding:14px 18px;">
+            <p style="font-weight:600; font-size:14px; color:var(--neon-cyan);">多副本部署</p>
+            <p class="text-xs text-gray">前端/后端多副本 + PDB 保障最小可用实例</p>
+          </div>
+          <div class="highlight-box" style="padding:14px 18px;">
+            <p style="font-weight:600; font-size:14px; color:var(--neon-cyan);">自动回滚机制</p>
+            <p class="text-xs text-gray">监控指标异常 → 自动触发回滚 → 切换稳定版本</p>
+          </div>
+          <div class="highlight-box" style="padding:14px 18px;">
+            <p style="font-weight:600; font-size:14px; color:var(--neon-cyan);">网络策略隔离</p>
+            <p class="text-xs text-gray">默认拒绝入站 + 数据库/Redis 专用网络策略</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 10: 监控告警 ==================== -->
+<section class="slide" id="slide-10" data-slide="10">
+  <div class="slide-number">10 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>监控告警体系</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">Prometheus + Grafana + AlertManager + ELK 全方位可观测性</p>
+    </div>
+
+    <div class="grid-2 animate-on-scroll stagger-1">
+      <div>
+        <h3 style="margin-bottom:16px;">📈 监控架构</h3>
+        <div class="flow-container" style="flex-direction:column; align-items:stretch; gap:12px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="flow-step" style="flex:1; border-color:rgba(0,102,255,0.4);">
+              <div class="step-icon">📡</div>
+              <div class="step-label">Prometheus 采集</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" style="flex:1; border-color:rgba(168,85,247,0.4);">
+              <div class="step-icon">💾</div>
+              <div class="step-label">时序数据存储</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="flow-step" style="flex:1; border-color:rgba(0,255,136,0.4);">
+              <div class="step-icon">📊</div>
+              <div class="step-label">Grafana 可视化</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" style="flex:1; border-color:rgba(255,136,0,0.4);">
+              <div class="step-icon">🔔</div>
+              <div class="step-label">AlertManager 告警</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <h3 style="margin-bottom:12px;">📋 告警规则</h3>
+          <div class="table-container">
+            <table class="data-table" style="font-size:13px;">
+              <thead><tr><th>类别</th><th>规则</th><th>级别</th></tr></thead>
+              <tbody>
+                <tr><td>节点</td><td>CPU > 80% / 内存 > 85%</td><td><span class="tag tag-red" style="font-size:11px;">P0</span></td></tr>
+                <tr><td>Pod</td><td>CrashLoopBackOff / Pending</td><td><span class="tag tag-red" style="font-size:11px;">P0</span></td></tr>
+                <tr><td>服务</td><td>错误率 > 5% / 响应 > 2s</td><td><span class="tag tag-orange" style="font-size:11px;">P1</span></td></tr>
+                <tr><td>资源</td><td>磁盘 > 90% / PVC 即将满</td><td><span class="tag tag-orange" style="font-size:11px;">P1</span></td></tr>
+                <tr><td>业务</td><td>部署失败 / 构建超时</td><td><span class="tag tag-purple" style="font-size:11px;">P2</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:16px;">🔔 多渠道通知</h3>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+            <span style="font-size:28px;">📧</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">邮件通知</p>
+              <p class="text-xs text-gray">SMTP 邮件告警，支持自定义模板</p>
+            </div>
+          </div>
+          <div class="card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+            <span style="font-size:28px;">💬</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">钉钉机器人</p>
+              <p class="text-xs text-gray">Webhook 推送，实时告警到群组</p>
+            </div>
+          </div>
+          <div class="card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+            <span style="font-size:28px;">🏢</span>
+            <div>
+              <p style="font-weight:600; font-size:14px;">企业微信</p>
+              <p class="text-xs text-gray">企业微信应用消息推送</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <h3 style="margin-bottom:12px;">📋 ELK 日志系统</h3>
+          <div class="code-block" style="font-size:12px;">
+<span class="comment">// 日志采集链路</span>
+Application → <span class="type">Fluent Bit</span> → <span class="type">Elasticsearch</span> → <span class="type">Kibana</span>
+
+<span class="comment">// 日志管理策略</span>
+├── 结构化 JSON 日志格式
+├── 索引生命周期管理 (ILM)
+├── 日志保留 90 天
+├── 审计日志保留 365 天
+└── 存储自动滚动策略</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 11: 安全设计 ==================== -->
+<section class="slide" id="slide-11" data-slide="11">
+  <div class="slide-number">11 / 12</div>
+  <div style="max-width:1100px; width:100%;">
+    <div class="animate-on-scroll">
+      <h2>安全设计</h2>
+      <div class="section-divider"></div>
+      <p class="text-gray mb-24">多层次安全防护，从传输加密到审计追踪的全方位安全体系</p>
+    </div>
+
+    <div class="grid-4 animate-on-scroll stagger-1">
+      <div class="card" style="text-align:center;">
+        <div class="icon-box blue" style="margin:0 auto 12px;">🔑</div>
+        <p style="font-weight:700; font-size:15px; margin-bottom:6px;">身份认证</p>
+        <p class="text-xs text-gray">JWT Token<br>bcrypt 密码加密<br>登录限流保护</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box purple" style="margin:0 auto 12px;">🛡️</div>
+        <p style="font-weight:700; font-size:15px; margin-bottom:6px;">权限控制</p>
+        <p class="text-xs text-gray">RBAC 角色模型<br>细粒度权限<br>最小权限原则</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box green" style="margin:0 auto 12px;">🔐</div>
+        <p style="font-weight:700; font-size:15px; margin-bottom:6px;">传输加密</p>
+        <p class="text-xs text-gray">TLS 1.3<br>HTTPS 全链路<br>AES-256 存储</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="icon-box orange" style="margin:0 auto 12px;">🔍</div>
+        <p style="font-weight:700; font-size:15px; margin-bottom:6px;">镜像安全</p>
+        <p class="text-xs text-gray">Trivy 漏洞扫描<br>高危阻断策略<br>Harbor 访问控制</p>
+      </div>
+    </div>
+
+    <div class="grid-2 animate-on-scroll stagger-2" style="margin-top:24px;">
+      <div>
+        <h3 style="margin-bottom:12px;">🔒 网络安全策略</h3>
+        <div class="code-block" style="font-size:12px;">
+<span class="comment">// Kubernetes NetworkPolicy</span>
+
+<span class="comment">// 默认拒绝所有入站</span>
+<span class="keyword">default-deny</span> → 拒绝所有入站流量
+
+<span class="comment">// 数据库专用策略</span>
+<span class="keyword">allow-database</span> → 仅允许后端服务访问
+
+<span class="comment">// Redis 专用策略</span>
+<span class="keyword">allow-redis</span> → 仅允许后端服务访问
+
+<span class="comment">// Ingress 控制</span>
+Nginx Ingress → 限制外部访问入口</div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:12px;">📝 审计日志</h3>
+        <div class="code-block" style="font-size:12px;">
+<span class="comment">// 审计日志记录内容</span>
+{
+  <span class="string">"user_id"</span>:   <span class="type">uint</span>,
+  <span class="string">"username"</span>:  <span class="type">string</span>,
+  <span class="string">"action"</span>:    <span class="type">string</span>,    <span class="comment">// 操作类型</span>
+  <span class="string">"resource"</span>:  <span class="type">string</span>,    <span class="comment">// 操作资源</span>
+  <span class="string">"method"</span>:    <span class="type">string</span>,    <span class="comment">// HTTP方法</span>
+  <span class="string">"path"</span>:      <span class="type">string</span>,    <span class="comment">// 请求路径</span>
+  <span class="string">"ip"</span>:        <span class="type">string</span>,    <span class="comment">// 来源IP</span>
+  <span class="string">"status"</span>:    <span class="type">int</span>        <span class="comment">// 响应状态</span>
+}
+
+<span class="comment">// 自动清理: 保留90天</span>
+cleanup_old_audit_logs(<span class="type">90</span>)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 12: 总结与展望 ==================== -->
+<section class="slide" id="slide-12" data-slide="12">
+  <div class="slide-number">12 / 12</div>
+  <div style="max-width:1100px; width:100%; text-align:center;">
+    <div class="animate-on-scroll">
+      <h2>项目总结与展望</h2>
+      <div class="section-divider" style="margin:0 auto 24px;"></div>
+    </div>
+
+    <div class="grid-3 animate-on-scroll stagger-1" style="margin-bottom:36px;">
+      <div class="card" style="text-align:center; border-top:3px solid var(--electric-blue);">
+        <div class="stat-number">8+</div>
+        <div class="stat-label">核心服务模块</div>
+      </div>
+      <div class="card" style="text-align:center; border-top:3px solid var(--accent-purple);">
+        <div class="stat-number">50+</div>
+        <div class="stat-label">API 接口</div>
+      </div>
+      <div class="card" style="text-align:center; border-top:3px solid var(--accent-green);">
+        <div class="stat-number">3</div>
+        <div class="stat-label">部署策略</div>
+      </div>
+    </div>
+
+    <div class="animate-on-scroll stagger-2" style="text-align:left; max-width:800px; margin:0 auto;">
+      <h3 style="margin-bottom:20px; text-align:center;">🎯 项目亮点</h3>
+      <div class="grid-2" style="gap:14px; margin-bottom:36px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="color:var(--accent-green); font-size:18px;">✦</span>
+          <span class="text-sm text-gray">完整的 CI/CD 全流程自动化闭环</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="color:var(--accent-green); font-size:18px;">✦</span>
+          <span class="text-sm text-gray">云原生架构，K8s 弹性伸缩</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="color:var(--accent-green); font-size:18px;">✦</span>
+          <span class="text-sm text-gray">多策略部署 + 自动回滚保障</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="color:var(--accent-green); font-size:18px;">✦</span>
+          <span class="text-sm text-gray">全方位监控告警与日志体系</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="color:var(--accent-green); font-size:18px;">✦</span>
+          <span class="text-sm text-gray">RBAC + 审计日志安全体系</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="color:var(--accent-green); font-size:18px;">✦</span>
+          <span class="text-sm text-gray">现代化 React 前端控制台</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="animate-on-scroll stagger-3" style="text-align:left; max-width:800px; margin:0 auto;">
+      <h3 style="margin-bottom:20px; text-align:center;">🚀 未来展望</h3>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="time-label">阶段一 (已完成)</div>
+          <div class="time-content">基础设施搭建 · 后端核心服务 · 前端控制台 · 认证权限体系</div>
+        </div>
+        <div class="timeline-item">
+          <div class="time-label">阶段二 (进行中)</div>
+          <div class="time-content">灰度发布完善 · 镜像漏洞扫描集成 · 多集群管理 · 插件系统</div>
+        </div>
+        <div class="timeline-item">
+          <div class="time-label">阶段三 (规划中)</div>
+          <div class="time-content">多云/混合云部署 · GitOps (ArgoCD) · AI 智能运维 · 服务网格 (Istio)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="animate-on-scroll stagger-4" style="margin-top:48px;">
+      <h1 class="glow-text" style="font-size:36px; margin-bottom:12px;">感谢聆听</h1>
+      <p class="text-gray" style="font-size:16px;">云原生容器化 CI/CD 自动化部署系统</p>
+      <p class="text-gray" style="font-size:14px; margin-top:8px;">代码即部署，部署即生效</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  const progressBar = document.getElementById('progressBar');
+  const navDotsContainer = document.getElementById('navDots');
+
+  for (let i = 0; i < totalSlides; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'nav-dot';
+    dot.setAttribute('data-index', i);
+    dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    dot.addEventListener('click', function() {
+      slides[i].scrollIntoView({ behavior: 'smooth' });
+    });
+    navDotsContainer.appendChild(dot);
+  }
+
+  const navDots = document.querySelectorAll('.nav-dot');
+
+  function updateProgress() {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = (scrollTop / docHeight) * 100;
+    progressBar.style.width = progress + '%';
+  }
+
+  function updateActiveSlide() {
+    const scrollPos = window.scrollY + window.innerHeight / 2;
+    let activeIndex = 0;
+
+    slides.forEach(function(slide, index) {
+      const top = slide.offsetTop;
+      const bottom = top + slide.offsetHeight;
+      if (scrollPos >= top && scrollPos < bottom) {
+        activeIndex = index;
+      }
+    });
+
+    navDots.forEach(function(dot, index) {
+      if (index === activeIndex) {
+        dot.classList.add('active');
+      } else {
+        dot.classList.remove('active');
+      }
+    });
+  }
+
+  function handleScrollAnimations() {
+    const elements = document.querySelectorAll('.animate-on-scroll');
+    elements.forEach(function(el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 0.85) {
+        el.classList.add('visible');
+      }
+    });
+  }
+
+  window.addEventListener('scroll', function() {
+    updateProgress();
+    updateActiveSlide();
+    handleScrollAnimations();
+  }, { passive: true });
+
+  document.addEventListener('keydown', function(e) {
+    const scrollPos = window.scrollY + window.innerHeight / 2;
+    let currentIndex = 0;
+
+    slides.forEach(function(slide, index) {
+      const top = slide.offsetTop;
+      const bottom = top + slide.offsetHeight;
+      if (scrollPos >= top && scrollPos < bottom) {
+        currentIndex = index;
+      }
+    });
+
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      if (currentIndex < totalSlides - 1) {
+        slides[currentIndex + 1].scrollIntoView({ behavior: 'smooth' });
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      if (currentIndex > 0) {
+        slides[currentIndex - 1].scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  });
+
+  handleScrollAnimations();
+  updateProgress();
+  updateActiveSlide();
+})();
+</script>
+
+</body>
+</html>
